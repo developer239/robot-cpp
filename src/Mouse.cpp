@@ -42,13 +42,13 @@ void Mouse::Move(Robot::Point point) {
 #endif
 }
 
-bool Mouse::MoveSmooth(Robot::Point point, double speed) {
+void Mouse::MoveSmooth(Robot::Point point, double speed) {
   const double step = 5.0;  // Change this value to adjust the granularity of the movement
   Robot::Point currentPosition = GetPosition();
   double distance = currentPosition.Distance(point);
 
   if (distance == 0) {
-    return false;
+    return;
   }
 
   int steps = static_cast<int>(distance / step);
@@ -66,7 +66,7 @@ bool Mouse::MoveSmooth(Robot::Point point, double speed) {
 
   // Move to the exact target position in case of small errors during movement
   Move(point);
-  return true;
+  return;
 }
 
 Robot::Point Mouse::GetPosition() {

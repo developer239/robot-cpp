@@ -19,6 +19,7 @@ enum class MouseButton : uint8_t {
   CENTER_BUTTON = 2
 };
 
+// TODO: improve MoveSmooth
 // TODO: implement Drag
 // TODO: implement ScrollBy smooth
 class Mouse {
@@ -29,7 +30,7 @@ class Mouse {
 
   static void Move(Robot::Point point);
 
-  static bool MoveSmooth(Robot::Point point, double speed = 500);
+  static void MoveSmooth(Robot::Point point, double speed = 500);
 
   static Robot::Point GetPosition();
 
