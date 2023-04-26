@@ -1,0 +1,14 @@
+# IDEs
+/.idea
+.vscode
+
+# Build files
+/cmake-build-debug
+
+# CMake submodules
+/cmake/imgui
+/cmake/sdl2
+
+# External submodules
+/externals/imgui
+/externals/googletest
