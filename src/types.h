@@ -1,12 +1,16 @@
 #pragma once
 
-#include <cstddef>
+#include <cmath>
 
 namespace Robot {
 
 struct Point {
-  size_t x;
-  size_t y;
+  int x;
+  int y;
+
+  [[nodiscard]] double Distance(Point target) const {
+    return sqrt(pow(target.x - x, 2) + pow(target.y - y, 2));
+  }
 };
 
 }  // namespace Robot

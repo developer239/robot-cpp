@@ -5,6 +5,12 @@
 #include <cstddef>
 #include <cstdint>
 
+#ifdef _WIN32
+#include <Windows.h>
+#elif __APPLE__
+#include <ApplicationServices/ApplicationServices.h>
+#endif
+
 namespace Robot {
 
 enum class MouseButton : uint8_t {
@@ -13,25 +19,36 @@ enum class MouseButton : uint8_t {
   CENTER_BUTTON = 2
 };
 
+// TODO: implement Drag
+// TODO: implement ScrollBy smooth
 class Mouse {
  public:
+  static unsigned int delay;
+
   Mouse() = delete;
 
-  static void moveMouse(Robot::Point point);
+  static void Move(Robot::Point point);
 
-  static void dragMouse(Robot::Point point, const MouseButton button);
+  static bool MoveSmooth(Robot::Point point, double speed = 500);
 
-  static bool smoothlyMoveMouse(Robot::Point point, double speed);
+  static Robot::Point GetPosition();
 
-  static Robot::Point getMousePos();
+  static void ToggleButton(
+      bool down, MouseButton button, bool doubleClick = false
+  );
 
-  static void toggleMouse(bool down, MouseButton button);
+  static void Click(MouseButton button);
 
-  static void clickMouse(MouseButton button);
+  static void DoubleClick(MouseButton button);
 
-  static void doubleClick(MouseButton button);
+  static void ScrollBy(int y, int x = 0);
 
-  static void scrollMouse(int x, int y);
+ private:
+#ifdef _WIN32
+  static POINT getCurrentPosition();
+#elif __APPLE__
+  static CGPoint getCurrentPosition();
+#endif
 };
 
 }  // namespace Robot
