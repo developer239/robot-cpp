@@ -5,8 +5,8 @@
 
 TEST(MouseTest, MouseMove) {
   Robot::delay(2000);
-  Robot::Point newPos{300, 300};
-  Robot::Mouse::MoveSmooth(newPos);
+  Robot::Point newPos{100, 100};
+  Robot::Mouse::Move(newPos);
 
   Robot::Point currentPos = Robot::Mouse::GetPosition();
 

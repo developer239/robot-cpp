@@ -1,0 +1,31 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'src/**'
+
+jobs:
+  build:
+    runs-on: macos-12
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+
+      - name: Install dependencies
+        run: |
+          brew install cmake ninja
+
+      - name: Create build directory
+        run: mkdir build
+
+      - name: Configure CMake
+        run: cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=$(brew --prefix)/bin/ninja -G Ninja -S . -B build
+
+      - name: Link
+        run: ninja
+        working-directory: build

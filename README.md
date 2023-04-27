@@ -1,16 +1,35 @@
 # Robot CPP
 
+![master](https://github.com/developer239/robot-cpp/actions/workflows/ci.yml/badge.svg)
+
 This library is inspired by older unmaintained libraries like [octalmage/robotjs](https://github.com/octalmage/robotjs)
 and [Robot/robot-js](https://github.com/Robot/robot-js). The goal is to provide cross-platform controls for various
 devices such as keyboard, mouse, and screen for C++ applications.
 
 **Supported system:**
 
-- Windows
-- MacOS
+- MacOS 
+- Windows **(not tested yet)**
 
 In case of Linux, please, create issue and leave a star and I will implement support. Right now I want to focus on port to
 Node.js using Node-API.
+
+## Installation
+
+**(not tested yet)**
+
+Add this library as submodule:
+
+```git
+$ git submodule add https://github.com/developer239/robot-cpp 
+```
+
+Update your CMake:
+
+```CMake
+add_subdirectory(externals/robot-cpp)
+target_link_libraries(<your_target> PRIVATE RobotCPP)
+```
 
 ## Types
 
