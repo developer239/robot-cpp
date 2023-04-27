@@ -12,6 +12,6 @@ add_subdirectory(externals/googletest)
 enable_testing()
 
 # Configure test executable
-set(SOURCES_TEST src/types.h src/Mouse.h src/Mouse.cpp src/Mouse.test.cpp src/Utils.h src/Utils.cpp)
+set(SOURCES_TEST src/types.h src/Mouse.h src/Mouse.cpp src/Mouse.test.cpp src/Utils.h src/Utils.cpp src/Keyboard.cpp src/Keyboard.h)
 add_executable(${LIB_NAME_TEST} ${SOURCES_TEST})
 target_link_libraries(${LIB_NAME_TEST} PRIVATE gtest gmock gmock_main "-framework Carbon")

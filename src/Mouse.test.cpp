@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "./Keyboard.h"
 #include "./Mouse.h"
 #include "./Utils.h"
 
