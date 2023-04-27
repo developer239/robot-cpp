@@ -1,3 +1,6 @@
 [submodule "externals/googletest"]
 	path = externals/googletest
 	url = https://github.com/google/googletest
+[submodule "externals/lodepng"]
+	path = externals/lodepng
+	url = https://github.com/lvandeve/lodepng

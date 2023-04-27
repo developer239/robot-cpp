@@ -125,3 +125,66 @@ int main() {
   Robot::Keyboard::TypeHumanLike("Hello, World");
 }
 ```
+
+## Screen Class
+
+The `Screen` class provides functionality to capture the screen, get pixel colors, and save the captured screen as a PNG image.
+
+### Public Methods
+
+- `Pixel GetPixelColor(int x, int y);`
+  Returns the color of the pixel at the specified (x, y) coordinates as a `Pixel` structure.
+
+- `DisplaySize GetScreenSize();`
+  Returns the size of the screen as a `DisplaySize` structure containing the width and height.
+
+- `void Capture(int x = 0, int y = 0, int width = -1, int height = -1);`
+  Captures a rectangular area of the screen defined by the specified (x, y) coordinates and dimensions (width, height).
+
+- `std::vector<Pixel> GetPixels() const;`
+  Returns a vector of `Pixel` structures representing the captured screen.
+
+- `void SaveAsPNG(const std::string &filename);`
+  Saves the captured screen as a PNG image with the specified filename.
+
+### Structures
+
+#### DisplaySize
+
+`DisplaySize` is a structure that represents the size of a display with integer dimensions (width, height).
+
+##### Attributes
+
+- `int width;`
+  The width of the display.
+
+- `int height;`
+  The height of the display.
+
+#### Pixel
+
+`Pixel` is a structure that represents the color of a pixel with unsigned char values for red, green, and blue channels.
+
+##### Attributes
+
+- `unsigned char r;`
+  The red channel value of the pixel.
+
+- `unsigned char g;`
+  The green channel value of the pixel.
+
+- `unsigned char b;`
+  The blue channel value of the pixel.
+
+### Example Usage
+
+```cpp
+#include "robot.h"
+
+int main() {
+  Robot::Screen screen;
+  screen.Capture(0, 0, 800, 600);
+  Robot::Pixel pixel = screen.GetPixelColor(100, 200);
+  screen.SaveAsPNG("screenshot.png");
+}
+```
