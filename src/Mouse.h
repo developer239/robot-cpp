@@ -19,9 +19,6 @@ enum class MouseButton : uint8_t {
   CENTER_BUTTON = 2
 };
 
-// TODO: improve MoveSmooth
-// TODO: implement Drag
-// TODO: implement ScrollBy smooth
 class Mouse {
  public:
   static unsigned int delay;
@@ -30,7 +27,9 @@ class Mouse {
 
   static void Move(Robot::Point point);
 
-  static void MoveSmooth(Robot::Point point, double speed = 500);
+  static void MoveSmooth(Robot::Point point, double speed = 1500);
+
+  static void Drag(Robot::Point point, double speed = 1500);
 
   static Robot::Point GetPosition();
 

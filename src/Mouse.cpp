@@ -43,30 +43,32 @@ void Mouse::Move(Robot::Point point) {
 }
 
 void Mouse::MoveSmooth(Robot::Point point, double speed) {
-  const double step = 5.0;  // Change this value to adjust the granularity of the movement
-  Robot::Point currentPosition = GetPosition();
-  double distance = currentPosition.Distance(point);
-
-  if (distance == 0) {
-    return;
+  if (speed <= 0) {
+    throw std::invalid_argument("Speed must be greater than 0");
   }
 
-  int steps = static_cast<int>(distance / step);
-  double dx = (point.x - currentPosition.x) / steps;
-  double dy = (point.y - currentPosition.y) / steps;
+  auto currentPosition = getCurrentPosition();
 
-  int delayTime = static_cast<int>(1000 / speed);
+  Robot::Point startPoint{
+      static_cast<int>(currentPosition.x),
+      static_cast<int>(currentPosition.y)};
 
-  for (int i = 0; i < steps; ++i) {
-    currentPosition.x += dx;
-    currentPosition.y += dy;
-    Move(currentPosition);
-    std::this_thread::sleep_for(std::chrono::milliseconds(delayTime));
+  double distance = std::hypot(point.x - startPoint.x, point.y - startPoint.y);
+  int numSteps = static_cast<int>(std::round(distance / speed * 100));
+
+  for (int step = 1; step <= numSteps; ++step) {
+    double t = static_cast<double>(step) / numSteps;
+    Robot::Point newPosition{
+        static_cast<int>(startPoint.x + (point.x - startPoint.x) * t),
+        static_cast<int>(startPoint.y + (point.y - startPoint.y) * t)};
+
+    Mouse::Move(newPosition);
+
+    Robot::delay(delay);
   }
 
-  // Move to the exact target position in case of small errors during movement
-  Move(point);
-  return;
+  // Ensure the final position is accurate
+  Mouse::Move(point);
 }
 
 Robot::Point Mouse::GetPosition() {
@@ -156,6 +158,12 @@ void Mouse::ScrollBy(int y, int x) {
   CGEventPost(kCGHIDEventTap, scrollEvent);
   CFRelease(scrollEvent);
 #endif
+}
+
+void Mouse::Drag(Robot::Point point, double speed) {
+  Mouse::ToggleButton(true, MouseButton::LEFT_BUTTON);
+  Mouse::MoveSmooth(point, speed);
+  Mouse::ToggleButton(false, MouseButton::LEFT_BUTTON);
 }
 
 }  // namespace Robot
