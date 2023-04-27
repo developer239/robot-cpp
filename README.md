@@ -16,12 +16,10 @@ Node.js using Node-API.
 
 ## Installation
 
-**(not tested yet)**
-
 Add this library as submodule:
 
 ```git
-$ git submodule add https://github.com/developer239/robot-cpp 
+$ git submodule add https://github.com/developer239/robot-cpp externals/robot-cpp 
 ```
 
 Update your CMake:
