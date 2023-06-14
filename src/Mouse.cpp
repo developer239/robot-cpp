@@ -183,4 +183,38 @@ void Mouse::Drag(Robot::Point toPoint) {
   Mouse::ToggleButton(false, MouseButton::LEFT_BUTTON);
 }
 
+void Mouse::MoveSmooth(Robot::Point point) {
+  Robot::Point currentPosition = GetPosition();
+
+  int dx = point.x - currentPosition.x;
+  int dy = point.y - currentPosition.y;
+
+  int steps = std::max(std::abs(dx), std::abs(dy));
+
+  float deltaX = static_cast<float>(dx) / steps;
+  float deltaY = static_cast<float>(dy) / steps;
+
+  for (int i = 1; i <= steps; i++) {
+    Robot::Point stepPosition;
+    stepPosition.x = currentPosition.x + static_cast<int>(deltaX * i);
+    stepPosition.y = currentPosition.y + static_cast<int>(deltaY * i);
+
+    if (Mouse::isPressed) {
+      MoveWithButtonPressed(stepPosition, Mouse::pressedButton);
+    } else {
+      Move(stepPosition);
+    }
+
+    Robot::delay(1);
+  }
+}
+
+void Mouse::DragSmooth(Robot::Point toPoint) {
+  Robot::Mouse::ToggleButton(true, Robot::MouseButton::LEFT_BUTTON);
+  Robot::delay(10);
+  Mouse::MoveSmooth(toPoint);
+  Robot::delay(10);
+  Mouse::ToggleButton(false, MouseButton::LEFT_BUTTON);
+}
+
 }  // namespace Robot

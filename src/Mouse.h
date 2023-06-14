@@ -30,7 +30,11 @@ class Mouse {
 
   static void Move(Robot::Point point);
 
+  static void MoveSmooth(Robot::Point point);
+
   static void Drag(Robot::Point toPoint);
+
+  static void DragSmooth(Robot::Point toPoint);
 
   static Robot::Point GetPosition();
 
