@@ -10,6 +10,8 @@
 namespace Robot {
 
 unsigned int Mouse::delay = 16;
+bool Mouse::isPressed = false;
+MouseButton Mouse::pressedButton = MouseButton::LEFT_BUTTON;
 
 #ifdef _WIN32
 POINT Mouse::getCurrentPosition() {
@@ -39,36 +41,11 @@ void Mouse::Move(Robot::Point point) {
   );
   CGEventPost(kCGHIDEventTap, event);
   CFRelease(event);
+
+  if (Mouse::isPressed) {
+    Mouse::MoveWithButtonPressed(point, Mouse::pressedButton);
+  }
 #endif
-}
-
-void Mouse::MoveSmooth(Robot::Point point, double speed) {
-  if (speed <= 0) {
-    throw std::invalid_argument("Speed must be greater than 0");
-  }
-
-  auto currentPosition = getCurrentPosition();
-
-  Robot::Point startPoint{
-      static_cast<int>(currentPosition.x),
-      static_cast<int>(currentPosition.y)};
-
-  double distance = std::hypot(point.x - startPoint.x, point.y - startPoint.y);
-  int numSteps = static_cast<int>(std::round(distance / speed * 100));
-
-  for (int step = 1; step <= numSteps; ++step) {
-    double t = static_cast<double>(step) / numSteps;
-    Robot::Point newPosition{
-        static_cast<int>(startPoint.x + (point.x - startPoint.x) * t),
-        static_cast<int>(startPoint.y + (point.y - startPoint.y) * t)};
-
-    Mouse::Move(newPosition);
-
-    Robot::delay(delay);
-  }
-
-  // Ensure the final position is accurate
-  Mouse::Move(point);
 }
 
 Robot::Point Mouse::GetPosition() {
@@ -126,8 +103,46 @@ void Mouse::ToggleButton(bool down, MouseButton button, bool doubleClick) {
     CGEventSetIntegerValueField(buttonEvent, kCGMouseEventClickState, 2);
   }
 
-  CGEventPost(kCGSessionEventTap, buttonEvent);
+  CGEventPost(kCGHIDEventTap, buttonEvent);
   CFRelease(buttonEvent);
+#endif
+
+  if (down) {
+    Mouse::isPressed = true;
+    Mouse::pressedButton = button;
+  } else {
+    Mouse::isPressed = false;
+  }
+}
+
+void Mouse::MoveWithButtonPressed(Robot::Point point, MouseButton button) {
+#ifdef _WIN32
+  // On Windows, just calling Move is enough as it will keep the button state.
+  Mouse::Move(point);
+#elif __APPLE__
+  CGPoint target = CGPointMake(point.x, point.y);
+
+  CGEventType dragEventType;
+  CGMouseButton cgButton;
+  switch (button) {
+    case MouseButton::LEFT_BUTTON:
+      dragEventType = kCGEventLeftMouseDragged;
+      cgButton = kCGMouseButtonLeft;
+      break;
+    case MouseButton::RIGHT_BUTTON:
+      dragEventType = kCGEventRightMouseDragged;
+      cgButton = kCGMouseButtonRight;
+      break;
+    case MouseButton::CENTER_BUTTON:
+      dragEventType = kCGEventOtherMouseDragged;
+      cgButton = kCGMouseButtonCenter;
+      break;
+  }
+
+  CGEventRef mouseDragEvent =
+      CGEventCreateMouseEvent(nullptr, dragEventType, target, cgButton);
+  CGEventPost(kCGHIDEventTap, mouseDragEvent);
+  CFRelease(mouseDragEvent);
 #endif
 }
 
@@ -160,9 +175,11 @@ void Mouse::ScrollBy(int y, int x) {
 #endif
 }
 
-void Mouse::Drag(Robot::Point point, double speed) {
-  Mouse::ToggleButton(true, MouseButton::LEFT_BUTTON);
-  Mouse::MoveSmooth(point, speed);
+void Mouse::Drag(Robot::Point toPoint) {
+  Robot::Mouse::ToggleButton(true, Robot::MouseButton::LEFT_BUTTON);
+  Robot::delay(10);
+  Mouse::Move(toPoint);
+  Robot::delay(10);
   Mouse::ToggleButton(false, MouseButton::LEFT_BUTTON);
 }
 

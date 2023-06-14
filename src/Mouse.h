@@ -23,13 +23,14 @@ class Mouse {
  public:
   static unsigned int delay;
 
+  static bool isPressed;
+  static MouseButton pressedButton;
+
   Mouse() = delete;
 
   static void Move(Robot::Point point);
 
-  static void MoveSmooth(Robot::Point point, double speed = 1500);
-
-  static void Drag(Robot::Point point, double speed = 1500);
+  static void Drag(Robot::Point toPoint);
 
   static Robot::Point GetPosition();
 
@@ -44,6 +45,8 @@ class Mouse {
   static void ScrollBy(int y, int x = 0);
 
  private:
+  static void MoveWithButtonPressed(Robot::Point point, MouseButton button);
+
 #ifdef _WIN32
   static POINT getCurrentPosition();
 #elif __APPLE__
