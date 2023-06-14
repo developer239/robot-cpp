@@ -45,6 +45,8 @@ class Keyboard {
     CAPSLOCK
   };
 
+  static const char INVALID_ASCII;
+
   Keyboard() = delete;
   virtual ~Keyboard() = default;
 
@@ -67,6 +69,7 @@ class Keyboard {
   static void Release(SpecialKey specialKey);
 
   static char VirtualKeyToAscii(KeyCode virtualKey);
+  static SpecialKey VirtualKeyToSpecialKey(KeyCode virtualKey);
 
  private:
   static std::thread keyPressThread;

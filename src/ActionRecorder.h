@@ -16,7 +16,8 @@ class Action {
     MOUSE_MOVE,
     MOUSE_LEFT_PRESS,
     MOUSE_LEFT_RELEASE,
-    KEYBOARD_CLICK,
+    KEYBOARD_PRESS,
+    KEYBOARD_RELEASE,
   };
 
   explicit Action(ActionType type, std::chrono::milliseconds delay)
@@ -29,10 +30,22 @@ class Action {
 
 class KeyboardAction : public Action {
  public:
-  KeyboardAction(char key, std::chrono::milliseconds delay)
-      : Action(ActionType::KEYBOARD_CLICK, delay), key(key) {}
+  KeyboardAction(ActionType type, uint16_t key, std::chrono::milliseconds delay)
+      : Action(type, delay), key(key) {}
 
-  char key;
+  uint16_t key;
+};
+
+class KeyboardPressAction : public KeyboardAction {
+ public:
+  KeyboardPressAction(uint16_t key, std::chrono::milliseconds delay)
+      : KeyboardAction(ActionType::KEYBOARD_PRESS, key, delay) {}
+};
+
+class KeyboardReleaseAction : public KeyboardAction {
+ public:
+  KeyboardReleaseAction(uint16_t key, std::chrono::milliseconds delay)
+      : KeyboardAction(ActionType::KEYBOARD_RELEASE, key, delay) {}
 };
 
 class MouseAction : public Action {
@@ -73,6 +86,18 @@ class ActionRecorder {
     );
   }
 
+  void RecordKeyPress(uint16_t key) {
+    actions.emplace_back(
+        std::make_unique<KeyboardPressAction>(key, GetAccumulatedDelay())
+    );
+  }
+
+  void RecordKeyRelease(uint16_t key) {
+    actions.emplace_back(
+        std::make_unique<KeyboardReleaseAction>(key, GetAccumulatedDelay())
+    );
+  }
+
   void RecordMouseMove(float x, float y) {
     actions.emplace_back(std::make_unique<MouseAction>(
         Action::ActionType::MOUSE_MOVE,
@@ -80,12 +105,6 @@ class ActionRecorder {
         y,
         GetAccumulatedDelay()
     ));
-  }
-
-  void RecordKeyboardClick(char key) {
-    actions.emplace_back(
-        std::make_unique<KeyboardAction>(key, GetAccumulatedDelay())
-    );
   }
 
   void ReplayActions() {
@@ -121,10 +140,29 @@ class ActionRecorder {
           }
           break;
         }
-        case Action::ActionType::KEYBOARD_CLICK: {
-          auto keyboardAction = dynamic_cast<KeyboardAction*>(action.get());
+        case Action::ActionType::KEYBOARD_PRESS: {
+          auto keyboardAction = dynamic_cast<KeyboardPressAction*>(action.get());
           if (keyboardAction) {
-            Keyboard::Click(keyboardAction->key);
+            char asciiKey = Keyboard::VirtualKeyToAscii(keyboardAction->key);
+            if(asciiKey != Keyboard::INVALID_ASCII) {
+              Keyboard::Press(asciiKey);
+            } else {
+              Keyboard::SpecialKey specialKey = Keyboard::VirtualKeyToSpecialKey(keyboardAction->key);
+              Keyboard::Press(specialKey);
+            }
+          }
+          break;
+        }
+        case Action::ActionType::KEYBOARD_RELEASE: {
+          auto keyboardAction = dynamic_cast<KeyboardReleaseAction*>(action.get());
+          if (keyboardAction) {
+            char asciiKey = Keyboard::VirtualKeyToAscii(keyboardAction->key);
+            if(asciiKey != Keyboard::INVALID_ASCII) {
+              Keyboard::Release(asciiKey);
+            } else {
+              Keyboard::SpecialKey specialKey = Keyboard::VirtualKeyToSpecialKey(keyboardAction->key);
+              Keyboard::Release(specialKey);
+            }
           }
           break;
         }

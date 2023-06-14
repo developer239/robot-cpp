@@ -4,7 +4,6 @@
 #include <iostream>
 #include "./ActionRecorder.h"
 
-// TODO: make work on windows
 namespace Robot {
 
 class EventHook {
@@ -12,11 +11,10 @@ class EventHook {
   explicit EventHook(ActionRecorder& recorder) : recorder(recorder) {}
 
   void StartRecording() {
-    CGEventMask eventMask = (1 << kCGEventMouseMoved) |
-                            (1 << kCGEventLeftMouseDragged) |
-                            (1 << kCGEventLeftMouseDown) |
-                            (1 << kCGEventLeftMouseUp) |
-                            (1 << kCGEventKeyDown);
+    CGEventMask eventMask =
+        (1 << kCGEventMouseMoved) | (1 << kCGEventLeftMouseDragged) |
+        (1 << kCGEventLeftMouseDown) | (1 << kCGEventLeftMouseUp) |
+        (1 << kCGEventKeyDown) | (1 << kCGEventKeyUp);
 
     eventTap = CGEventTapCreate(
         kCGSessionEventTap,
@@ -86,7 +84,13 @@ class EventHook {
       case kCGEventKeyDown: {
         auto keyCode = (CGKeyCode
         )CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
-        recorder->RecordKeyboardClick(Keyboard::VirtualKeyToAscii(keyCode));
+        recorder->RecordKeyPress(keyCode);
+        break;
+      }
+      case kCGEventKeyUp: {
+        auto keyCode = (CGKeyCode
+        )CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
+        recorder->RecordKeyRelease(keyCode);
         break;
       }
       default:

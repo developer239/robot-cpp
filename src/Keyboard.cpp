@@ -12,6 +12,8 @@ namespace Robot {
 
 int Keyboard::delay = 1;
 
+const char Keyboard::INVALID_ASCII = static_cast<char>(0xFF);
+
 std::thread Keyboard::keyPressThread;
 std::atomic<bool> Keyboard::continueHolding(false);
 std::set<char> Keyboard::heldAsciiChars;
@@ -284,6 +286,7 @@ std::map<char, int> Keyboard::asciiToVirtualKeyMap = {
     {'.', kVK_ANSI_Period},     {'/', kVK_ANSI_Slash}};
 
 char Keyboard::VirtualKeyToAscii(KeyCode virtualKey) {
+#ifdef __APPLE__
   auto map = asciiToVirtualKeyMap;
   auto it = std::find_if(
       map.begin(),
@@ -294,12 +297,49 @@ char Keyboard::VirtualKeyToAscii(KeyCode virtualKey) {
   );
 
   if (it == map.end()) {
-    std::cerr << "Warning: Virtual key not found in the ascii map. Ignoring..."
-              << std::endl;
-    return 0xFFFF;  // Return an invalid keycode
+    return INVALID_ASCII;
   }
 
   return it->first;
+#endif
 }
+
+Keyboard::SpecialKey Keyboard::VirtualKeyToSpecialKey(KeyCode virtualKey) {
+#ifdef __APPLE__
+  switch (virtualKey) {
+    case 123:
+      return Keyboard::LEFT;
+    case 124:
+      return Keyboard::RIGHT;
+    case 125:
+      return Keyboard::DOWN;
+    case 126:
+      return Keyboard::UP;
+    case 36:
+      return Keyboard::ENTER;
+    case 48:
+      return Keyboard::TAB;
+    case 51:
+      return Keyboard::BACKSPACE;
+    case 53:
+      return Keyboard::ESCAPE;
+    case 55:
+      return Keyboard::META;
+    case 56:
+      return Keyboard::SHIFT;
+    case 57:
+      return Keyboard::CAPSLOCK;
+    case 58:
+      return Keyboard::ALT;
+    case 59:
+      return Keyboard::CONTROL;
+  }
+#endif
+
+#ifdef _WIN32
+    // TODO: implement
+#endif
+}
+
 #endif
 }  // namespace Robot
