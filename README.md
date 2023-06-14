@@ -205,3 +205,89 @@ int main() {
   screen.SaveAsPNG("screenshot.png");
 }
 ```
+
+## Record and Replay Classes [MacOS Only]
+
+The `ActionRecorder` and `EventHook` classes provide functionality for recording user actions (such as mouse clicks and keyboard key presses) and replaying them later.
+
+### ActionRecorder Class
+
+The `ActionRecorder` class is responsible for recording user actions and storing them as a sequence of actions. It provides methods to record mouse clicks, keyboard key presses, and mouse movements.
+
+#### Public Methods
+
+- `void RecordPressLeft(float x, float y);`
+  Records a left mouse button press action at the specified coordinates (x, y).
+
+- `void RecordReleaseLeft(float x, float y);`
+  Records a left mouse button release action at the specified coordinates (x, y).
+
+- `void RecordKeyPress(uint16_t key);`
+  Records a keyboard key press action for the specified virtual key code.
+
+- `void RecordKeyRelease(uint16_t key);`
+  Records a keyboard key release action for the specified virtual key code.
+
+- `void RecordMouseMove(float x, float y);`
+  Records a mouse movement action to the specified coordinates (x, y).
+
+- `void ReplayActions();`
+  Replays the recorded actions in the same sequence they were recorded.
+
+### EventHook Class
+
+The `EventHook` class is responsible for hooking into system events and capturing user actions in real-time. It uses the Core Graphics Event Tap API to intercept mouse and keyboard events. The captured events are then forwarded to the `ActionRecorder` for recording.
+
+#### Public Methods
+
+- `explicit EventHook(ActionRecorder& recorder);`
+  Constructs an `EventHook` object with a reference to the `ActionRecorder` instance.
+
+- `void StartRecording();`
+  Starts the event hook and begins recording user actions.
+
+- `void StopRecording();`
+  Stops the event hook and stops recording user actions.
+
+Please note that the `EventHook` class currently supports macOS, and Windows support is not yet implemented.
+
+### Example Usage
+
+Here's an example code snippet demonstrating how to use the `ActionRecorder` and `EventHook` classes to record and replay user actions:
+
+```cpp
+#include <EventHook.h>
+#include <Utils.h>
+#include <iostream>
+
+int main() {
+  int recordFor = 10;
+
+  Robot::ActionRecorder recorder;
+  Robot::EventHook hook(recorder);
+
+  std::cout << "Start recording actions in 3 seconds..." << std::endl;
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+
+  // Start recording
+  std::cout << "Starting to record actions for " << recordFor << " seconds..." << std::endl;
+  std::thread recordingThread([&hook] { hook.StartRecording(); });
+
+  // Sleep for 10 seconds
+  std::this_thread::sleep_for(std::chrono::seconds(recordFor));
+
+  // Stop recording
+  std::cout << "Stopping recording..." << std::endl;
+  hook.StopRecording();
+  recordingThread.join();
+
+  // Wait for 5 seconds before replaying
+  std::cout << "Replaying actions in 3 seconds..." << std::endl;
+  std::this_thread::sleep_for(std::chrono::seconds(3));
+
+  // Replay the recorded actions
+  std::cout << "Replaying actions..." << std::endl;
+  recorder.ReplayActions();
+
+  return 0;
+}

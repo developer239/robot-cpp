@@ -12,6 +12,11 @@
 #include <map>
 #endif
 
+#include <atomic>
+#include <chrono>
+#include <set>
+#include <thread>
+
 namespace Robot {
 
 #ifdef __APPLE__
@@ -40,6 +45,8 @@ class Keyboard {
     CAPSLOCK
   };
 
+  static const char INVALID_ASCII;
+
   Keyboard() = delete;
   virtual ~Keyboard() = default;
 
@@ -50,13 +57,28 @@ class Keyboard {
   static void Click(char asciiChar);
   static void Click(SpecialKey specialKey);
 
+  static void HoldStart(char asciiChar);
+  static void HoldStart(SpecialKey specialKey);
+  static void HoldStop(char asciiChar);
+  static void HoldStop(SpecialKey specialKey);
+
   static void Press(char asciiChar);
   static void Press(SpecialKey specialKey);
 
   static void Release(char asciiChar);
   static void Release(SpecialKey specialKey);
 
+  static char VirtualKeyToAscii(KeyCode virtualKey);
+  static SpecialKey VirtualKeyToSpecialKey(KeyCode virtualKey);
+
  private:
+  static std::thread keyPressThread;
+  static std::atomic<bool> continueHolding;
+  static std::set<char> heldAsciiChars;
+  static std::set<SpecialKey> heldSpecialKeys;
+
+  static void KeyHoldThread();
+
   static int delay;
 
   static KeyCode AsciiToVirtualKey(char asciiChar);
