@@ -12,6 +12,10 @@
 #include <map>
 #endif
 
+#include <atomic>
+#include <chrono>
+#include <thread>
+
 namespace Robot {
 
 #ifdef __APPLE__
@@ -50,6 +54,10 @@ class Keyboard {
   static void Click(char asciiChar);
   static void Click(SpecialKey specialKey);
 
+  static void HoldStart(char asciiChar);
+  static void HoldStart(SpecialKey specialKey);
+  static void HoldStop();
+
   static void Press(char asciiChar);
   static void Press(SpecialKey specialKey);
 
@@ -59,6 +67,11 @@ class Keyboard {
   static char VirtualKeyToAscii(KeyCode virtualKey);
 
  private:
+  static std::thread keyPressThread;
+  static std::atomic<bool> continueHolding;
+  static void KeyHoldThread(char asciiChar);
+  static void KeyHoldThreadSpecialKey(SpecialKey specialKey);
+
   static int delay;
 
   static KeyCode AsciiToVirtualKey(char asciiChar);

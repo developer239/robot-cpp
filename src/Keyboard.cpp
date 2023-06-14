@@ -12,6 +12,42 @@ namespace Robot {
 
 int Keyboard::delay = 1;
 
+std::thread Keyboard::keyPressThread;
+std::atomic<bool> Keyboard::continueHolding(false);
+
+void Keyboard::HoldStart(char asciiChar) {
+  continueHolding = true;
+  keyPressThread = std::thread(KeyHoldThread, asciiChar);
+}
+
+void Keyboard::HoldStart(SpecialKey specialKey) {
+  continueHolding = true;
+  keyPressThread = std::thread(KeyHoldThreadSpecialKey, specialKey);
+}
+
+void Keyboard::HoldStop() {
+  continueHolding = false;
+  if (keyPressThread.joinable()) {
+    keyPressThread.join();
+  }
+}
+
+void Keyboard::KeyHoldThread(char asciiChar) {
+  while (continueHolding) {
+    Press(asciiChar);
+    Robot::delay(50);
+  }
+  Release(asciiChar);
+}
+
+void Keyboard::KeyHoldThreadSpecialKey(SpecialKey specialKey) {
+  while (continueHolding) {
+    Press(specialKey);
+    Robot::delay(50);
+  }
+  Release(specialKey);
+}
+
 void Keyboard::Type(const std::string &query) {
   for (char c : query) {
     Click(c);
