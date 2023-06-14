@@ -127,7 +127,7 @@ void Screen::CaptureScreen() {
 #endif
 }
 
-void Screen::saveAsPNG(const std::string &filename) {
+void Screen::SaveAsPNG(const std::string &filename) {
   std::vector<unsigned char> png;
 
   // Convert the captured pixel data to RGBA format
@@ -140,9 +140,9 @@ void Screen::saveAsPNG(const std::string &filename) {
     rgbaPixels.push_back(pixel.b);
     rgbaPixels.push_back(255);
 #elif defined(_WIN32)
-    rgbaPixels.push_back(pixel.r);
-    rgbaPixels.push_back(pixel.g);
     rgbaPixels.push_back(pixel.b);
+    rgbaPixels.push_back(pixel.g);
+    rgbaPixels.push_back(pixel.r);
     rgbaPixels.push_back(255);
 #endif
   }

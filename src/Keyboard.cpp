@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <random>
+#include <map>
 
 #include "./Keyboard.h"
 #include "./Utils.h"
