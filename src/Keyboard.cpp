@@ -14,38 +14,64 @@ int Keyboard::delay = 1;
 
 std::thread Keyboard::keyPressThread;
 std::atomic<bool> Keyboard::continueHolding(false);
+std::set<char> Keyboard::heldAsciiChars;
+std::set<Keyboard::SpecialKey> Keyboard::heldSpecialKeys;
 
 void Keyboard::HoldStart(char asciiChar) {
-  continueHolding = true;
-  keyPressThread = std::thread(KeyHoldThread, asciiChar);
+  if (heldAsciiChars.empty() && heldSpecialKeys.empty()) {
+    continueHolding = true;
+    keyPressThread = std::thread(KeyHoldThread);
+  }
+  heldAsciiChars.insert(asciiChar);
 }
 
 void Keyboard::HoldStart(SpecialKey specialKey) {
-  continueHolding = true;
-  keyPressThread = std::thread(KeyHoldThreadSpecialKey, specialKey);
-}
-
-void Keyboard::HoldStop() {
-  continueHolding = false;
-  if (keyPressThread.joinable()) {
-    keyPressThread.join();
+  if (heldAsciiChars.empty() && heldSpecialKeys.empty()) {
+    continueHolding = true;
+    keyPressThread = std::thread(KeyHoldThread);
   }
+  heldSpecialKeys.insert(specialKey);
 }
 
-void Keyboard::KeyHoldThread(char asciiChar) {
-  while (continueHolding) {
-    Press(asciiChar);
-    Robot::delay(50);
+void Keyboard::HoldStop(char asciiChar) {
+  heldAsciiChars.erase(asciiChar);
+  if (heldAsciiChars.empty() && heldSpecialKeys.empty()) {
+    continueHolding = false;
+    if (keyPressThread.joinable()) {
+      keyPressThread.join();
+    }
   }
   Release(asciiChar);
 }
 
-void Keyboard::KeyHoldThreadSpecialKey(SpecialKey specialKey) {
-  while (continueHolding) {
-    Press(specialKey);
-    Robot::delay(50);
+void Keyboard::HoldStop(SpecialKey specialKey) {
+  heldSpecialKeys.erase(specialKey);
+  if (heldAsciiChars.empty() && heldSpecialKeys.empty()) {
+    continueHolding = false;
+    if (keyPressThread.joinable()) {
+      keyPressThread.join();
+    }
   }
   Release(specialKey);
+}
+
+void Keyboard::KeyHoldThread() {
+  while (continueHolding) {
+    for (char asciiChar : heldAsciiChars) {
+      Press(asciiChar);
+    }
+    for (SpecialKey specialKey : heldSpecialKeys) {
+      Press(specialKey);
+    }
+    Robot::delay(50);
+  }
+
+  for (char asciiChar : heldAsciiChars) {
+    Release(asciiChar);
+  }
+  for (SpecialKey specialKey : heldSpecialKeys) {
+    Release(specialKey);
+  }
 }
 
 void Keyboard::Type(const std::string &query) {

@@ -3,33 +3,28 @@
 #include <iostream>
 
 int main() {
-  int recordFor = 30;
+  using namespace Robot;
 
-  Robot::ActionRecorder recorder;
-  Robot::EventHook hook(recorder);
+  std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
-  std::cout << "Start recording actions in 3 seconds..." << std::endl;
-  std::this_thread::sleep_for(std::chrono::seconds(3));
+  std::cout << "Pressing and holding SHIFT key" << std::endl;
+  Keyboard::HoldStart(Keyboard::SHIFT); // Start holding SHIFT key
 
-  // Start recording
-  std::cout << "Starting to record actions for " << recordFor << " seconds..." << std::endl;
-  std::thread recordingThread([&hook] { hook.StartRecording(); });
+  std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Wait for 0.5 seconds
 
-  // Sleep for 10 seconds
-  std::this_thread::sleep_for(std::chrono::seconds(recordFor));
+  std::cout << "Pressing and holding 'A' key" << std::endl;
+  Keyboard::HoldStart('a'); // Start holding 'A' key
 
-  // Stop recording
-  std::cout << "Stopping recording..." << std::endl;
-  hook.StopRecording();
-  recordingThread.join();
+  std::this_thread::sleep_for(std::chrono::seconds(2)); // Wait for 2 seconds
 
-  // Wait for 5 seconds before replaying
-  std::cout << "Replaying actions in 3 seconds..." << std::endl;
-  std::this_thread::sleep_for(std::chrono::seconds(3));
+  std::cout << "Releasing SHIFT key" << std::endl;
+  Keyboard::HoldStop(Keyboard::SHIFT); // Release SHIFT key
 
-  // Replay the recorded actions
-  std::cout << "Replaying actions..." << std::endl;
-  recorder.ReplayActions();
+  std::this_thread::sleep_for(std::chrono::milliseconds(500)); // wait for 500 ms to ensure SHIFT key is fully released
+
+  std::cout << "Releasing 'a' key" << std::endl;
+  Keyboard::HoldStop('a'); // Release 'A' key
 
   return 0;
 }
+

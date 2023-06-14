@@ -14,6 +14,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <set>
 #include <thread>
 
 namespace Robot {
@@ -56,7 +57,8 @@ class Keyboard {
 
   static void HoldStart(char asciiChar);
   static void HoldStart(SpecialKey specialKey);
-  static void HoldStop();
+  static void HoldStop(char asciiChar);
+  static void HoldStop(SpecialKey specialKey);
 
   static void Press(char asciiChar);
   static void Press(SpecialKey specialKey);
@@ -69,8 +71,10 @@ class Keyboard {
  private:
   static std::thread keyPressThread;
   static std::atomic<bool> continueHolding;
-  static void KeyHoldThread(char asciiChar);
-  static void KeyHoldThreadSpecialKey(SpecialKey specialKey);
+  static std::set<char> heldAsciiChars;
+  static std::set<SpecialKey> heldSpecialKeys;
+
+  static void KeyHoldThread();
 
   static int delay;
 
