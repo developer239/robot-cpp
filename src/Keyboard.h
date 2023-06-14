@@ -56,6 +56,8 @@ class Keyboard {
   static void Release(char asciiChar);
   static void Release(SpecialKey specialKey);
 
+  static char VirtualKeyToAscii(KeyCode virtualKey);
+
  private:
   static int delay;
 
