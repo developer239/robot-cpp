@@ -1,6 +1,10 @@
-#include <EventHook.h>
 #include <Utils.h>
 #include <iostream>
+#include <ActionRecorder.h>
+// Comment out to test on MacOS
+#include <EventHookWindows.h>
+// Uncomment to test on MacOS
+// #include <EventHookMacOS.h>
 
 int main() {
   int recordFor = 10;

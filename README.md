@@ -1,6 +1,8 @@
 # Robot CPP
 
 ![master](https://github.com/developer239/robot-cpp/actions/workflows/ci.yml/badge.svg)
+![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
+![macOS](https://img.shields.io/badge/mac%20os-000000?style=for-the-badge&logo=macos&logoColor=F0F0F0)
 
 This library is inspired by older unmaintained libraries like [octalmage/robotjs](https://github.com/octalmage/robotjs)
 and [Robot/robot-js](https://github.com/Robot/robot-js). The goal is to provide cross-platform controls for various
@@ -9,7 +11,7 @@ devices such as keyboard, mouse, and screen for C++ applications.
 **Supported system:**
 
 - MacOS 
-- Windows **(not tested yet)**
+- Windows
 
 In case of Linux, please, create issue and leave a star and I will implement support. Right now I want to focus on port to
 Node.js using Node-API.
@@ -139,6 +141,7 @@ The `Keyboard` class provides a static interface for simulating keyboard key pre
 #include "robot.h"
 
 int main() {
+  // Note that this will type the text in lower case and likely without special characters like !@#$%^&*()
   Robot::Keyboard::TypeHumanLike("Hello, World");
 }
 ```
@@ -206,7 +209,9 @@ int main() {
 }
 ```
 
-## Record and Replay Classes [MacOS Only]
+## Record and Replay Keybaord and Mouse Actions
+
+**Note:** It seems that recorded mouse position is slightly shifted on Windows.
 
 The `ActionRecorder` and `EventHook` classes provide functionality for recording user actions (such as mouse clicks and keyboard key presses) and replaying them later.
 

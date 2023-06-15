@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <string>
+#include <map>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -9,7 +10,6 @@
 
 #ifdef __APPLE__
 #import <Carbon/Carbon.h>
-#include <map>
 #endif
 
 #include <atomic>

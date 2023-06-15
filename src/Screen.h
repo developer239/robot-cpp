@@ -36,7 +36,7 @@ class Screen {
 
   std::vector<Pixel> GetPixels() const;
 
-  void saveAsPNG(const std::string &filename);
+  void SaveAsPNG(const std::string &filename);
 
  private:
 #if defined(__APPLE__)

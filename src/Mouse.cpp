@@ -152,20 +152,21 @@ void Mouse::Click(MouseButton button) {
 }
 
 void Mouse::DoubleClick(MouseButton button) {
-  ToggleButton(true, button, true);
-  ToggleButton(false, button, false);
+  Click(button);
+  Click(button);
 }
 
 void Mouse::ScrollBy(int y, int x) {
 #ifdef _WIN32
   INPUT input = {0};
   input.type = INPUT_MOUSE;
+
   input.mi.dwFlags = MOUSEEVENTF_WHEEL;
-  input.mi.mouseData = static_cast<DWORD>(y);
+  input.mi.mouseData = static_cast<DWORD>(WHEEL_DELTA * y);
   SendInput(1, &input, sizeof(INPUT));
 
   input.mi.dwFlags = MOUSEEVENTF_HWHEEL;
-  input.mi.mouseData = static_cast<DWORD>(x);
+  input.mi.mouseData = static_cast<DWORD>(WHEEL_DELTA * x);
   SendInput(1, &input, sizeof(INPUT));
 #elif __APPLE__
   CGEventRef scrollEvent =
@@ -189,7 +190,7 @@ void Mouse::MoveSmooth(Robot::Point point) {
   int dx = point.x - currentPosition.x;
   int dy = point.y - currentPosition.y;
 
-  int steps = std::max(std::abs(dx), std::abs(dy));
+  int steps = (std::abs(dx) > std::abs(dy)) ? std::abs(dx) : std::abs(dy);
 
   float deltaX = static_cast<float>(dx) / steps;
   float deltaY = static_cast<float>(dy) / steps;
