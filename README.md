@@ -218,7 +218,7 @@ int main() {
 }
 ```
 
-## Record and Replay Keybaord and Mouse Actions
+## Record and Replay Keyboard and Mouse Actions
 
 **Note:** It seems that recorded mouse position is slightly shifted on Windows.
 
