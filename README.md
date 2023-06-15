@@ -16,6 +16,15 @@ devices such as keyboard, mouse, and screen for C++ applications.
 In case of Linux, please, create issue and leave a star and I will implement support. Right now I want to focus on port to
 Node.js using Node-API.
 
+## What can you do with it?
+
+- Move mouse and simulate clicks
+- Simulate keyboard presses and releases as well as easily program more advanced interactions (for example `TypeHumanLike`)
+- Capture selected part of the screen and save it as PNG
+- **Record and replay mouse and keyboard events** 
+
+There are some limitations but I would be more than happy to fix them and implement additional features. Feel free to create issue I will make the PR. 👀
+
 ## Installation
 
 Add this library as submodule:
