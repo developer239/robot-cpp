@@ -229,6 +229,105 @@ std::map<Keyboard::SpecialKey, KeyCode> Keyboard::specialKeyToVirtualKeyMap = {
     {Keyboard::CAPSLOCK, kVK_CapsLock}};
 #endif
 
+  char Keyboard::VirtualKeyToAscii(KeyCode virtualKey) {
+#ifdef __APPLE__
+    auto map = asciiToVirtualKeyMap;
+  auto it = std::find_if(
+      map.begin(),
+      map.end(),
+      [virtualKey](const std::pair<char, int> &p) {
+        return p.second == virtualKey;
+      }
+  );
+
+  if (it == map.end()) {
+    return INVALID_ASCII;
+  }
+
+  return it->first;
+#endif
+
+#ifdef _WIN32
+    // Convert the virtual key code to a scan code
+    UINT scanCode = MapVirtualKey(virtualKey, MAPVK_VK_TO_VSC);
+
+    // Convert the scan code to the corresponding character
+    char character = 0;
+    BYTE keyboardState[256] = {0};
+    GetKeyboardState(keyboardState);
+    wchar_t buffer[2];
+    if (ToUnicode(virtualKey, scanCode, keyboardState, buffer, 2, 0) == 1) {
+      character = static_cast<char>(buffer[0]);
+    }
+    return character;
+#endif
+  }
+
+  Keyboard::SpecialKey Keyboard::VirtualKeyToSpecialKey(KeyCode virtualKey) {
+#ifdef __APPLE__
+    switch (virtualKey) {
+    case 123:
+      return Keyboard::LEFT;
+    case 124:
+      return Keyboard::RIGHT;
+    case 125:
+      return Keyboard::DOWN;
+    case 126:
+      return Keyboard::UP;
+    case 36:
+      return Keyboard::ENTER;
+    case 48:
+      return Keyboard::TAB;
+    case 51:
+      return Keyboard::BACKSPACE;
+    case 53:
+      return Keyboard::ESCAPE;
+    case 55:
+      return Keyboard::META;
+    case 56:
+      return Keyboard::SHIFT;
+    case 57:
+      return Keyboard::CAPSLOCK;
+    case 58:
+      return Keyboard::ALT;
+    case 59:
+      return Keyboard::CONTROL;
+  }
+#endif
+
+#ifdef _WIN32
+    switch (virtualKey) {
+      case VK_LEFT:
+        return Keyboard::LEFT;
+      case VK_RIGHT:
+        return Keyboard::RIGHT;
+      case VK_DOWN:
+        return Keyboard::DOWN;
+      case VK_UP:
+        return Keyboard::UP;
+      case VK_RETURN:
+        return Keyboard::ENTER;
+      case VK_TAB:
+        return Keyboard::TAB;
+      case VK_BACK:
+        return Keyboard::BACKSPACE;
+      case VK_ESCAPE:
+        return Keyboard::ESCAPE;
+      case VK_LWIN:
+      case VK_RWIN:
+        return Keyboard::META;
+      case VK_SHIFT:
+        return Keyboard::SHIFT;
+      case VK_CAPITAL:
+        return Keyboard::CAPSLOCK;
+      case VK_MENU:
+        return Keyboard::ALT;
+      case VK_CONTROL:
+        return Keyboard::CONTROL;
+    }
+#endif
+  }
+
 #ifdef _WIN32
 std::map<Keyboard::SpecialKey, KeyCode> Keyboard::specialKeyToVirtualKeyMap = {
     {Keyboard::BACKSPACE, VK_BACK},
@@ -285,62 +384,5 @@ std::map<char, int> Keyboard::asciiToVirtualKeyMap = {
     {'\\', kVK_ANSI_Backslash}, {39, kVK_ANSI_Quote},  // single quote
     {';', kVK_ANSI_Semicolon},  {',', kVK_ANSI_Comma},
     {'.', kVK_ANSI_Period},     {'/', kVK_ANSI_Slash}};
-
-char Keyboard::VirtualKeyToAscii(KeyCode virtualKey) {
-#ifdef __APPLE__
-  auto map = asciiToVirtualKeyMap;
-  auto it = std::find_if(
-      map.begin(),
-      map.end(),
-      [virtualKey](const std::pair<char, int> &p) {
-        return p.second == virtualKey;
-      }
-  );
-
-  if (it == map.end()) {
-    return INVALID_ASCII;
-  }
-
-  return it->first;
-#endif
-}
-
-Keyboard::SpecialKey Keyboard::VirtualKeyToSpecialKey(KeyCode virtualKey) {
-#ifdef __APPLE__
-  switch (virtualKey) {
-    case 123:
-      return Keyboard::LEFT;
-    case 124:
-      return Keyboard::RIGHT;
-    case 125:
-      return Keyboard::DOWN;
-    case 126:
-      return Keyboard::UP;
-    case 36:
-      return Keyboard::ENTER;
-    case 48:
-      return Keyboard::TAB;
-    case 51:
-      return Keyboard::BACKSPACE;
-    case 53:
-      return Keyboard::ESCAPE;
-    case 55:
-      return Keyboard::META;
-    case 56:
-      return Keyboard::SHIFT;
-    case 57:
-      return Keyboard::CAPSLOCK;
-    case 58:
-      return Keyboard::ALT;
-    case 59:
-      return Keyboard::CONTROL;
-  }
-#endif
-
-#ifdef _WIN32
-    // TODO: implement
-#endif
-}
-
 #endif
 }  // namespace Robot

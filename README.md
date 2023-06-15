@@ -209,7 +209,9 @@ int main() {
 }
 ```
 
-## Record and Replay Classes [MacOS Only]
+## Record and Replay Keybaord and Mouse Actions
+
+**Note:** It seems that recorded mouse position is slightly shifted on Windows.
 
 The `ActionRecorder` and `EventHook` classes provide functionality for recording user actions (such as mouse clicks and keyboard key presses) and replaying them later.
 
