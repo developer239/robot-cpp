@@ -10,7 +10,7 @@ devices such as keyboard, mouse, and screen for C++ applications.
 
 **Supported system:**
 
-- MacOS 
+- MacOS
 - Windows
 
 In case of Linux, please, create issue and leave a star and I will implement support. Right now I want to focus on port to
@@ -21,7 +21,7 @@ Node.js using Node-API.
 - Move mouse and simulate clicks
 - Simulate keyboard presses and releases as well as easily program more advanced interactions (for example `TypeHumanLike`)
 - Capture selected part of the screen and save it as PNG
-- **Record and replay mouse and keyboard events** 
+- **Record and replay mouse and keyboard events**
 
 There are some limitations but I would be more than happy to fix them and implement additional features. Feel free to create issue I will make the PR. 👀
 
@@ -31,6 +31,11 @@ Add this library as submodule:
 
 ```git
 $ git submodule add https://github.com/developer239/robot-cpp externals/robot-cpp 
+```
+
+Load modules dependencies:
+```git
+$ git submodule update --init --recursive
 ```
 
 Update your CMake:
