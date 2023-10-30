@@ -226,7 +226,19 @@ std::map<Keyboard::SpecialKey, KeyCode> Keyboard::specialKeyToVirtualKeyMap = {
     {Keyboard::ALT, kVK_Option},
     {Keyboard::CONTROL, kVK_Control},
     {Keyboard::SHIFT, kVK_Shift},
-    {Keyboard::CAPSLOCK, kVK_CapsLock}};
+    {Keyboard::CAPSLOCK, kVK_CapsLock},
+    {Keyboard::F1, kVK_F1},
+    {Keyboard::F2, kVK_F2},
+    {Keyboard::F3, kVK_F3},
+    {Keyboard::F4, kVK_F4},
+    {Keyboard::F5, kVK_F5},
+    {Keyboard::F6, kVK_F6},
+    {Keyboard::F7, kVK_F7},
+    {Keyboard::F8, kVK_F8},
+    {Keyboard::F9, kVK_F9},
+    {Keyboard::F10, kVK_F10},
+    {Keyboard::F11, kVK_F11},
+    {Keyboard::F12, kVK_F12}};
 #endif
 
   char Keyboard::VirtualKeyToAscii(KeyCode virtualKey) {
@@ -342,7 +354,19 @@ std::map<Keyboard::SpecialKey, KeyCode> Keyboard::specialKeyToVirtualKeyMap = {
     {Keyboard::ALT, VK_MENU},
     {Keyboard::CONTROL, VK_CONTROL},
     {Keyboard::SHIFT, VK_SHIFT},
-    {Keyboard::CAPSLOCK, VK_CAPITAL}};
+    {Keyboard::CAPSLOCK, VK_CAPITAL},
+    {Keyboard::F1, VK_F1},
+    {Keyboard::F2, VK_F2},
+    {Keyboard::F3, VK_F3},
+    {Keyboard::F4, VK_F4},
+    {Keyboard::F5, VK_F5},
+    {Keyboard::F6, VK_F6},
+    {Keyboard::F7, VK_F7},
+    {Keyboard::F8, VK_F8},
+    {Keyboard::F9, VK_F9},
+    {Keyboard::F10, VK_F10},
+    {Keyboard::F11, VK_F11},
+    {Keyboard::F12, VK_F12}};
 #endif
 
 #ifdef __APPLE__
