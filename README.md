@@ -33,6 +33,11 @@ Add this library as submodule:
 $ git submodule add https://github.com/developer239/robot-cpp externals/robot-cpp 
 ```
 
+Load modules dependencies:
+```git
+$ git submodule update --init --recursive
+```
+
 Update your CMake:
 
 ```CMake
