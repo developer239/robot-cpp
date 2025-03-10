@@ -45,21 +45,39 @@ jobs:
         with:
           submodules: recursive
 
-      # Use the official vcpkg cache action
+      # Alternative approach: clone vcpkg directly
       - name: Setup vcpkg
-        uses: friendlyanon/setup-vcpkg@v1
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git
+          cd vcpkg
+          .\bootstrap-vcpkg.bat
+        shell: cmd
 
       - name: Install SDL2
         run: |
-          vcpkg install sdl2:x64-windows
-        shell: bash
+          .\vcpkg\vcpkg.exe install sdl2:x64-windows
+        shell: cmd
+
+      # Debug step to verify toolchain file existence
+      - name: Verify vcpkg toolchain
+        run: |
+          dir vcpkg\scripts\buildsystems
+          if (Test-Path "vcpkg\scripts\buildsystems\vcpkg.cmake") {
+            Write-Host "Toolchain file found!"
+          } else {
+            Write-Host "Toolchain file not found!"
+          }
+        shell: powershell
 
       - name: Configure
         shell: powershell
         run: |
           mkdir build
           cd build
-          cmake .. -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" -DCMAKE_BUILD_TYPE=Release -DBUILD_HEADLESS_TESTS=ON
+          # Use an absolute path that we know exists
+          $vcpkgToolchain = "$pwd\..\vcpkg\scripts\buildsystems\vcpkg.cmake"
+          Write-Host "Using toolchain file: $vcpkgToolchain"
+          cmake .. -DCMAKE_TOOLCHAIN_FILE="$vcpkgToolchain" -DCMAKE_BUILD_TYPE=Release -DBUILD_HEADLESS_TESTS=ON
 
       - name: Build
         shell: powershell
@@ -70,5 +88,14 @@ jobs:
       - name: Run SDL tests in CI mode
         shell: powershell
         run: |
-          cd build\bin\Release
-          .\RobotCPPSDLTest.exe --ci-mode --run-tests
+          if (Test-Path "build\bin\Release\RobotCPPSDLTest.exe") {
+            cd build\bin\Release
+            .\RobotCPPSDLTest.exe --ci-mode --run-tests
+          } elseif (Test-Path "build\tests\Release\RobotCPPSDLTest.exe") {
+            cd build\tests\Release
+            .\RobotCPPSDLTest.exe --ci-mode --run-tests
+          } else {
+            Write-Host "Searching for RobotCPPSDLTest.exe..."
+            Get-ChildItem -Path build -Recurse -Filter "RobotCPPSDLTest.exe" | ForEach-Object { $_.FullName }
+            exit 1
+          }
