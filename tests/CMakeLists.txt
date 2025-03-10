@@ -33,8 +33,26 @@ target_link_libraries(${SDL_TEST_NAME} PRIVATE
         SDL2::SDL2
 )
 
-# Copy test assets
-file(COPY assets DESTINATION ${CMAKE_BINARY_DIR}/tests)
+# Set output directory to be consistent across build types
+set_target_properties(${SDL_TEST_NAME} PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/bin"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin"
+)
 
-add_test(NAME FunctionalTests
-        COMMAND ${SDL_TEST_NAME} --headless --run-tests)
+# Copy test assets
+file(COPY assets DESTINATION ${CMAKE_BINARY_DIR}/bin)
+
+# Add a custom command to build the SDL test executable as part of ALL target
+add_custom_target(build_sdl_tests ALL DEPENDS ${SDL_TEST_NAME})
+
+# Add the SDL test as a test
+add_test(NAME SDLFunctionalTests
+        COMMAND ${SDL_TEST_NAME} --headless --run-tests
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# Add another test configuration for interactive mode
+add_test(NAME SDLInteractiveTests
+        COMMAND ${SDL_TEST_NAME}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set_tests_properties(SDLInteractiveTests PROPERTIES DISABLED TRUE)

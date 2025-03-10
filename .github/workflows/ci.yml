@@ -1,36 +1,108 @@
-name: Build
+name: CI
 
 on:
   push:
-    branches:
-      - master
-    paths:
-      - 'src/**'
+    branches: [ master ]
   pull_request:
-    branches:
-      - master
-    paths:
-      - 'src/**'
+    branches: [ master ]
 
 jobs:
-  build:
-    runs-on: macos-12
+  test-linux:
+    runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
-          submodules: 'recursive'
+          submodules: recursive
 
       - name: Install dependencies
         run: |
-          brew install cmake ninja
+          sudo apt-get update
+          sudo apt-get install -y xvfb libsdl2-dev
 
-      - name: Create build directory
-        run: mkdir build
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          cmake ..
 
-      - name: Configure CMake
-        run: cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=$(brew --prefix)/bin/ninja -G Ninja -S . -B build
+      - name: Build
+        run: |
+          cd build
+          cmake --build .
 
-      - name: Link
-        run: ninja
-        working-directory: build
+      - name: Run unit tests
+        run: |
+          cd build
+          ./tests/RobotCPPTest
+
+      - name: Run functional tests with Xvfb
+        run: |
+          cd build
+          xvfb-run --auto-servernum --server-args='-screen 0 1280x720x24' ./tests/RobotCPPSDLTest --headless --run-tests
+
+  test-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          brew install sdl2
+
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+
+      - name: Build
+        run: |
+          cd build
+          cmake --build .
+
+      - name: Run tests
+        run: |
+          cd build
+          ./tests/RobotCPPTest
+          ./tests/RobotCPPSDLTest --headless --run-tests
+
+  test-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 5568f110b509a9fd90711978a7cb76bae75bb092
+
+      - name: Install SDL2
+        run: |
+          vcpkg install sdl2:x64-windows
+
+      - name: Configure
+        shell: powershell
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
+
+      - name: Build
+        shell: powershell
+        run: |
+          cd build
+          cmake --build . --config Release
+
+      - name: Run tests
+        shell: powershell
+        run: |
+          cd build/tests/Release
+          ./RobotCPPTest.exe
+          ./RobotCPPSDLTest.exe --headless --run-tests

@@ -1,12 +1,11 @@
 #pragma once
 
-#include <SDL.h>
-#include <chrono>
-#include <thread>
 #include <iostream>
-#include <vector>
-#include <cmath>
+#include <string>
 #include <filesystem>
+#include <vector>
+#include <optional>
+#include <cmath>
 
 #include "TestElements.h"
 #include "../../src/Screen.h"
@@ -93,7 +92,7 @@ public:
             if (abs(pixel.r - expectedColor.r) > tolerance ||
                 abs(pixel.g - expectedColor.g) > tolerance ||
                 abs(pixel.b - expectedColor.b) > tolerance) {
-                std::cout << "Pixel color test failed for " << area.getName() << endl;
+                std::cout << "Pixel color test failed for " << area.getName() << std::endl;
                 std::cout << "Expected: RGB(" << (int)expectedColor.r << ", "
                           << (int)expectedColor.g << ", " << (int)expectedColor.b << ")" << std::endl;
                 std::cout << "Actual: RGB(" << (int)pixel.r << ", "
