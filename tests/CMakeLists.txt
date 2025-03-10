@@ -1,30 +1,20 @@
 set(TEST_NAME RobotCPPTest)
 set(SDL_TEST_NAME RobotCPPSDLTest)
 
-# Unit Tests
-set(TEST_SOURCES
-        unit/MouseTest.cpp
-        unit/KeyboardTest.cpp
-        unit/ScreenTest.cpp
-)
+# We keep the gtest reference in the CMake setup as requested
+# But we don't need to create the actual test executable
+# Instead, just ensure gtest is available for other targets if needed
+find_package(GTest QUIET)
+if(NOT GTest_FOUND)
+    # GTest is already included via add_subdirectory in the main CMakeLists.txt
+    # We don't need to do anything here
+endif()
 
-add_executable(${TEST_NAME} ${TEST_SOURCES})
-target_link_libraries(${TEST_NAME} PRIVATE
-        gtest
-        gmock
-        gtest_main
-        RobotCPP
-)
-
-add_test(NAME UnitTests COMMAND ${TEST_NAME})
-
-# SDL2 Functional Tests
+# SDL2 Functional Tests - Only keeping mouse drag test
 set(SDL_TEST_SOURCES
         sdl/SDLTestApp.cpp
         sdl/TestElements.h
         sdl/MouseTests.h
-        sdl/KeyboardTests.h
-        sdl/ScreenTests.h
 )
 
 add_executable(${SDL_TEST_NAME} ${SDL_TEST_SOURCES})

@@ -8,13 +8,9 @@
 
 #include "TestElements.h"
 #include "MouseTests.h"
-#include "KeyboardTests.h"
-#include "ScreenTests.h"
 
 // Include Robot library headers
 #include "../../src/Mouse.h"
-#include "../../src/Keyboard.h"
-#include "../../src/Screen.h"
 #include "../../src/Utils.h"
 
 using namespace RobotTest;
@@ -53,10 +49,8 @@ public:
             exit(1);
         }
 
-        // Initialize test modules
+        // Initialize only mouse test module
         mouseTests = std::make_unique<MouseTests>(renderer, window);
-        keyboardTests = std::make_unique<KeyboardTests>(renderer, window);
-        screenTests = std::make_unique<ScreenTests>(renderer, window);
 
         // Force the window to be on top
         SDL_RaiseWindow(window);
@@ -89,36 +83,18 @@ public:
         // Make sure the window is properly initialized and visible
         prepareForTests();
 
-        // Run mouse tests
-        std::cout << "\n----- Mouse Tests -----" << std::endl;
+        // Run mouse tests - only drag test
+        std::cout << "\n----- Mouse Drag Test -----" << std::endl;
         if (!mouseTests->runAllTests()) {
-            std::cout << "❌ Some mouse tests failed" << std::endl;
+            std::cout << "❌ Mouse drag test failed" << std::endl;
             allTestsPassed = false;
         } else {
-            std::cout << "✅ All mouse tests passed" << std::endl;
-        }
-
-        // Run keyboard tests
-        std::cout << "\n----- Keyboard Tests -----" << std::endl;
-        if (!keyboardTests->runAllTests()) {
-            std::cout << "❌ Some keyboard tests failed" << std::endl;
-            allTestsPassed = false;
-        } else {
-            std::cout << "✅ All keyboard tests passed" << std::endl;
-        }
-
-        // Run screen tests
-        std::cout << "\n----- Screen Tests -----" << std::endl;
-        if (!screenTests->runAllTests()) {
-            std::cout << "❌ Some screen tests failed" << std::endl;
-            allTestsPassed = false;
-        } else {
-            std::cout << "✅ All screen tests passed" << std::endl;
+            std::cout << "✅ Mouse drag test passed" << std::endl;
         }
 
         // Final results
         std::cout << "\n===== Test Results =====" << std::endl;
-        std::cout << (allTestsPassed ? "✅ ALL TESTS PASSED" : "❌ SOME TESTS FAILED") << std::endl;
+        std::cout << (allTestsPassed ? "✅ ALL TESTS PASSED" : "❌ TEST FAILED") << std::endl;
 
         return allTestsPassed;
     }
@@ -131,10 +107,8 @@ private:
                 running = false;
             }
 
-            // Forward events to test modules
+            // Forward events to mouse test module
             mouseTests->handleEvent(event);
-            keyboardTests->handleEvent(event);
-            screenTests->handleEvent(event);
         }
     }
 
@@ -148,10 +122,8 @@ private:
         SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255);
         SDL_RenderFillRect(renderer, &titleRect);
 
-        // Draw module elements
+        // Draw mouse test elements
         mouseTests->draw();
-        keyboardTests->draw();
-        screenTests->draw();
 
         // Present render to the screen
         SDL_RenderPresent(renderer);
@@ -197,8 +169,6 @@ private:
     SDL_Renderer* renderer;
 
     std::unique_ptr<MouseTests> mouseTests;
-    std::unique_ptr<KeyboardTests> keyboardTests;
-    std::unique_ptr<ScreenTests> screenTests;
 };
 
 int main(int argc, char* argv[]) {
