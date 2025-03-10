@@ -5,6 +5,7 @@
 #include <chrono>
 #include <thread>
 #include <memory>
+#include <atomic>
 
 #include "TestElements.h"
 #include "MouseTests.h"
@@ -60,6 +61,11 @@ public:
     }
 
     ~RobotTestApp() {
+        // Clean up any running tests
+        if (mouseTests) {
+            mouseTests->cleanup();
+        }
+
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
         SDL_Quit();
@@ -85,12 +91,50 @@ public:
 
         // Run mouse tests - only drag test
         std::cout << "\n----- Mouse Drag Test -----" << std::endl;
-        if (!mouseTests->runAllTests()) {
+
+        // Start the test in a separate thread
+        mouseTests->startDragTest();
+
+        // Run SDL event loop while tests are executing
+        auto startTime = std::chrono::steady_clock::now();
+        auto timeout = std::chrono::seconds(30); // 30 seconds timeout
+
+        std::cout << "Running SDL event loop during test execution..." << std::endl;
+
+        // Keep going until the test is completed or timeout
+        while (!mouseTests->isTestCompleted()) {
+            // Process SDL events - THIS MUST BE ON MAIN THREAD
+            handleEvents();
+
+            // Update test state from main thread
+            mouseTests->updateFromMainThread();
+
+            // Render the screen
+            render();
+
+            // Check if we've timed out
+            auto elapsed = std::chrono::steady_clock::now() - startTime;
+            if (elapsed > timeout) {
+                std::cout << "Test execution timed out!" << std::endl;
+                break;
+            }
+
+            // Don't hog the CPU
+            SDL_Delay(16); // ~60 FPS
+        }
+
+        // Get test result
+        bool testPassed = mouseTests->getTestResult();
+
+        if (!testPassed) {
             std::cout << "❌ Mouse drag test failed" << std::endl;
             allTestsPassed = false;
         } else {
             std::cout << "✅ Mouse drag test passed" << std::endl;
         }
+
+        // Make sure we clean up the test thread
+        mouseTests->cleanup();
 
         // Final results
         std::cout << "\n===== Test Results =====" << std::endl;
@@ -172,7 +216,7 @@ private:
 };
 
 int main(int argc, char* argv[]) {
-    bool runTests = false;
+    bool runTests = true;
     int waitTime = 2000; // Default wait time in ms before tests
 
     // Parse command line arguments
