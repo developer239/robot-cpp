@@ -5,6 +5,14 @@ project(RobotCPP)
 set(CMAKE_CXX_STANDARD 23)
 set(LIB_NAME RobotCPP)
 
+# Add GoogleTest
+add_subdirectory(externals/googletest)
+enable_testing()
+
+# Find SDL2 for tests
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/sdl2/")
+find_package(SDL2 REQUIRED)
+
 set(COMMON_SOURCES
         src/ActionRecorder.h
         src/types.h
@@ -33,3 +41,6 @@ endif ()
 add_library(${LIB_NAME} STATIC ${COMMON_SOURCES} ${PLATFORM_SOURCES} ${SOURCES_LODEPNG})
 target_include_directories(${LIB_NAME} PUBLIC src PRIVATE externals/lodepng)
 target_link_libraries(${LIB_NAME} ${PLATFORM_LIBRARIES})
+
+# Add the tests directory
+add_subdirectory(tests)
