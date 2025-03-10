@@ -5,6 +5,9 @@ project(RobotCPP)
 set(CMAKE_CXX_STANDARD 23)
 set(LIB_NAME RobotCPP)
 
+# Add option for headless tests
+option(BUILD_HEADLESS_TESTS "Configure tests to run in headless/CI environments" OFF)
+
 # Add GoogleTest
 add_subdirectory(externals/googletest)
 enable_testing()
@@ -38,9 +41,19 @@ elseif (WIN32)
     list(APPEND PLATFORM_SOURCES src/EventHookWindows.h)
 endif ()
 
+# If building headless tests, define a preprocessor flag
+if (BUILD_HEADLESS_TESTS)
+    add_compile_definitions(ROBOT_HEADLESS_TESTS)
+endif()
+
 add_library(${LIB_NAME} STATIC ${COMMON_SOURCES} ${PLATFORM_SOURCES} ${SOURCES_LODEPNG})
 target_include_directories(${LIB_NAME} PUBLIC src PRIVATE externals/lodepng)
 target_link_libraries(${LIB_NAME} ${PLATFORM_LIBRARIES})
+
+# Set output directory for all targets
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin)
 
 # Add the tests directory
 add_subdirectory(tests)

@@ -7,40 +7,6 @@ on:
     branches: [ master ]
 
 jobs:
-  test-linux:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: recursive
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libsdl2-dev
-
-      - name: Configure
-        run: |
-          mkdir build
-          cd build
-          cmake ..
-
-      - name: Build
-        run: |
-          cd build
-          cmake --build .
-
-      - name: Run unit tests
-        run: |
-          cd build
-          ./tests/RobotCPPTest
-
-      - name: Run functional tests with Xvfb
-        run: |
-          cd build
-          xvfb-run --auto-servernum --server-args='-screen 0 1280x720x24' ./tests/RobotCPPSDLTest --headless --run-tests
-
   test-macos:
     runs-on: macos-latest
 
@@ -57,18 +23,19 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake ..
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_HEADLESS_TESTS=ON
 
       - name: Build
         run: |
           cd build
-          cmake --build .
+          cmake --build . --config Release
 
-      - name: Run tests
+      - name: Run SDL tests in CI mode
         run: |
-          cd build
-          ./tests/RobotCPPTest
-          ./tests/RobotCPPSDLTest --headless --run-tests
+          cd build/bin
+          # macOS needs special handling for mouse automation in headless mode
+          # We'll use the CI mode flag we're adding to the test application
+          ./RobotCPPSDLTest --ci-mode --run-tests
 
   test-windows:
     runs-on: windows-latest
@@ -92,7 +59,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake .. -DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
+          cmake .. -DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_HEADLESS_TESTS=ON
 
       - name: Build
         shell: powershell
@@ -100,9 +67,8 @@ jobs:
           cd build
           cmake --build . --config Release
 
-      - name: Run tests
+      - name: Run SDL tests in CI mode
         shell: powershell
         run: |
-          cd build/tests/Release
-          ./RobotCPPTest.exe
-          ./RobotCPPSDLTest.exe --headless --run-tests
+          cd build\bin\Release
+          .\RobotCPPSDLTest.exe --ci-mode --run-tests

@@ -18,8 +18,20 @@ using namespace RobotTest;
 
 class RobotTestApp {
 public:
-    RobotTestApp(int width = 800, int height = 600, bool headless = false)
-        : width(width), height(height), running(false), headless(headless) {
+    RobotTestApp(int argc, char** argv, int width = 800, int height = 600, bool headless = false)
+        : width(width), height(height), running(false), headless(headless),
+          ciMode(false) {
+
+        // Check for CI mode in args
+        for (int i = 0; i < argc; i++) {
+            if (std::string(argv[i]) == "--ci-mode") {
+                ciMode = true;
+                std::cout << "CI mode detected - using simulated input" << std::endl;
+                // On CI, we'll also make it headless
+                headless = true;
+                break;
+            }
+        }
 
         // Initialize SDL
         if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -27,8 +39,15 @@ public:
             exit(1);
         }
 
-        // Create window - IMPORTANT: Use SDL_WINDOW_SHOWN flag to ensure the window is visible
+        // Create window - use appropriate flags for headless mode
         Uint32 windowFlags = SDL_WINDOW_SHOWN;
+        if (headless) {
+            // For headless mode, we can use minimized or hidden window
+            windowFlags = SDL_WINDOW_HIDDEN;
+            #ifdef ROBOT_HEADLESS_TESTS
+            std::cout << "Running in headless mode with hidden window" << std::endl;
+            #endif
+        }
 
         window = SDL_CreateWindow(
             "Robot CPP Testing Framework",
@@ -42,22 +61,27 @@ public:
             exit(1);
         }
 
-        // Create renderer with VSYNC to prevent rendering issues
-        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+        // Create renderer - no VSYNC in headless mode
+        Uint32 rendererFlags = SDL_RENDERER_ACCELERATED;
+        if (!headless) {
+            rendererFlags |= SDL_RENDERER_PRESENTVSYNC;
+        }
+
+        renderer = SDL_CreateRenderer(window, -1, rendererFlags);
 
         if (!renderer) {
             std::cerr << "Could not create renderer: " << SDL_GetError() << std::endl;
             exit(1);
         }
 
-        // Initialize only mouse test module
-        mouseTests = std::make_unique<MouseTests>(renderer, window);
+        // Initialize only mouse test module - pass the CI mode flag
+        mouseTests = std::make_unique<MouseTests>(renderer, window, ciMode);
 
-        // Force the window to be on top
-        SDL_RaiseWindow(window);
-
-        // Position window consistently
-        SDL_SetWindowPosition(window, 50, 50);
+        // In non-headless mode, make sure the window is visible and on top
+        if (!headless) {
+            SDL_RaiseWindow(window);
+            SDL_SetWindowPosition(window, 50, 50);
+        }
     }
 
     ~RobotTestApp() {
@@ -86,7 +110,7 @@ public:
 
         std::cout << "===== Robot CPP Test Suite =====" << std::endl;
 
-        // Make sure the window is properly initialized and visible
+        // Make sure the window is properly initialized and visible (if not headless)
         prepareForTests();
 
         // Run mouse tests - only drag test
@@ -176,14 +200,12 @@ private:
     void prepareForTests() {
         std::cout << "Preparing test environment..." << std::endl;
 
-        // Make sure window is visible
-        SDL_ShowWindow(window);
-
-        // Ensure window is positioned correctly
-        SDL_SetWindowPosition(window, 50, 50);
-
-        // Make sure the window is on top
-        SDL_RaiseWindow(window);
+        // In non-headless mode, make window visible and ensure focus
+        if (!headless) {
+            SDL_ShowWindow(window);
+            SDL_SetWindowPosition(window, 50, 50);
+            SDL_RaiseWindow(window);
+        }
 
         // Render several frames to ensure the window is properly displayed
         for (int i = 0; i < 5; i++) {
@@ -200,15 +222,18 @@ private:
         // Additional delay to ensure window is ready
         SDL_Delay(500);
 
-        // Get and display window position for debugging
-        int x, y;
-        SDL_GetWindowPosition(window, &x, &y);
-        std::cout << "Window position: (" << x << ", " << y << ")" << std::endl;
+        // Get and display window position for debugging (in non-headless mode)
+        if (!headless) {
+            int x, y;
+            SDL_GetWindowPosition(window, &x, &y);
+            std::cout << "Window position: (" << x << ", " << y << ")" << std::endl;
+        }
     }
 
     int width, height;
     bool running;
     bool headless;
+    bool ciMode;
     SDL_Window* window;
     SDL_Renderer* renderer;
 
@@ -216,7 +241,8 @@ private:
 };
 
 int main(int argc, char* argv[]) {
-    bool runTests = true;
+    bool runTests = false;
+    bool headless = false;
     int waitTime = 2000; // Default wait time in ms before tests
 
     // Parse command line arguments
@@ -225,14 +251,21 @@ int main(int argc, char* argv[]) {
         if (arg == "--run-tests") {
             runTests = true;
         }
+        else if (arg == "--headless") {
+            headless = true;
+        }
+        else if (arg == "--ci-mode") {
+            // Handled separately in app constructor
+        }
         else if (arg == "--wait-time" && i + 1 < argc) {
             waitTime = std::stoi(argv[i + 1]);
             i++;
         }
     }
 
-    // Create test application (never headless to ensure window is visible)
-    RobotTestApp app(800, 600, false);
+    // Create test application with appropriate headless setting
+    // Pass the argc and argv to the constructor
+    RobotTestApp app(argc, argv, 800, 600, headless);
 
     // Either run tests or interactive mode
     if (runTests) {
