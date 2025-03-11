@@ -21,9 +21,6 @@ TEST_F(MouseDragTest, CanDragElementToNewPosition) {
         "Drag Test Element"
     );
 
-    // Process events for a short while to ensure window is fully rendered
-    processEventsFor(std::chrono::milliseconds(1000));
-
     // Initial position of the element
     const SDL_Rect initialRect = dragElement->getRect();
 
@@ -75,10 +72,6 @@ TEST_F(MouseDragTest, CanDragElementToNewPosition) {
 
     // Perform the drag operation
     performMouseDrag(startPoint, endPoint);
-
-    // Add additional delay after drag to ensure events are processed
-    std::cout << "Waiting for drag operation to complete..." << std::endl;
-    processEventsFor(std::chrono::milliseconds(2000));
 
     // Get the element's position after the drag
     const SDL_Rect finalRect = dragElement->getRect();

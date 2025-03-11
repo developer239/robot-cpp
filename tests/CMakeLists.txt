@@ -48,9 +48,9 @@ add_test(
 )
 
 # Add interactive test configuration
-add_test(
-        NAME SDLInteractiveTests
-        COMMAND ${SDL_TEST_NAME} --interactive
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-)
-set_tests_properties(SDLInteractiveTests PROPERTIES DISABLED TRUE)
+#add_test(
+#        NAME SDLInteractiveTests
+#        COMMAND ${SDL_TEST_NAME} --interactive
+#        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+#)
+#set_tests_properties(SDLInteractiveTests PROPERTIES DISABLED TRUE)

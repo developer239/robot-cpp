@@ -15,13 +15,13 @@ namespace RobotTest {
 
         // Test execution settings
         bool runTests = false;
-        std::chrono::milliseconds initialWaitTime{6000}; // Increased to 6 seconds
-        std::chrono::seconds testTimeout{60}; // Increased to 60 seconds
+        std::chrono::milliseconds initialWaitTime{6000};
+        std::chrono::seconds testTimeout{60};
 
         // Delay settings for animation and visualization
         std::chrono::milliseconds frameDelay{16}; // ~60 FPS
-        std::chrono::milliseconds setupDelay{1500}; // Increased to 1.5 seconds
-        std::chrono::milliseconds actionDelay{900}; // Increased to 900ms (3x original)
+        std::chrono::milliseconds setupDelay{1500};
+        std::chrono::milliseconds actionDelay{900};
 
         // Window positioning
         int windowX = 50;
