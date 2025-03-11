@@ -11,6 +11,7 @@ set(SDL_TEST_SOURCES
         sdl/SDLTestMain.cpp
         sdl/MouseTests.cpp
         sdl/TestElements.h
+        sdl/ExtendedTestElements.h
         sdl/TestContext.h
         sdl/TestConfig.h
         sdl/RobotSDLTestFixture.h
@@ -43,6 +44,6 @@ add_custom_target(build_sdl_tests ALL DEPENDS ${SDL_TEST_NAME})
 # Add automated tests (exclude interactive tests)
 add_test(
         NAME SDLFunctionalTests
-        COMMAND ${SDL_TEST_NAME}
+        COMMAND ${SDL_TEST_NAME} --run-tests
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )

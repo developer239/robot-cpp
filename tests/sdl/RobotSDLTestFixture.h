@@ -5,10 +5,13 @@
 #include <chrono>
 #include <thread>
 #include <future>
+#include <vector>
+#include <memory>
 
 #include "TestContext.h"
 #include "TestConfig.h"
 #include "TestElements.h"
+#include "ExtendedTestElements.h"
 #include "../../src/Mouse.h"
 
 namespace RobotTest {
@@ -55,6 +58,109 @@ namespace RobotTest {
         }
 
         /**
+         * @brief Creates a test button and adds it to the test elements collection
+         * @return Pointer to the created button (owned by the fixture)
+         */
+        TestButton *createTestButton(int x, int y, int width, int height,
+                                    Color color, const std::string &name) {
+            auto button = std::make_unique<TestButton>(
+                SDL_Rect{x, y, width, height}, color, name);
+
+            // Add click event handler
+            context_->addEventHandler([button = button.get()](const SDL_Event& event) {
+                if (event.type == SDL_MOUSEBUTTONDOWN &&
+                    event.button.button == SDL_BUTTON_LEFT) {
+                    int x = event.button.x;
+                    int y = event.button.y;
+                    if (button->isInside(x, y)) {
+                        button->handleClick();
+                    }
+                }
+            });
+
+            auto *rawPtr = button.get();
+            testElements_.push_back(std::move(button));
+            return rawPtr;
+        }
+
+        /**
+         * @brief Creates a double-click button and adds it to the test elements collection
+         * @return Pointer to the created button (owned by the fixture)
+         */
+        DoubleClickButton *createDoubleClickButton(int x, int y, int width, int height,
+                                                  Color color, const std::string &name) {
+            auto button = std::make_unique<DoubleClickButton>(
+                SDL_Rect{x, y, width, height}, color, name);
+
+            // Add click event handler
+            context_->addEventHandler([button = button.get()](const SDL_Event& event) {
+                if (event.type == SDL_MOUSEBUTTONDOWN &&
+                    event.button.button == SDL_BUTTON_LEFT) {
+                    int x = event.button.x;
+                    int y = event.button.y;
+                    if (button->isInside(x, y)) {
+                        button->handleClick();
+                    }
+                }
+            });
+
+            auto *rawPtr = button.get();
+            testElements_.push_back(std::move(button));
+            return rawPtr;
+        }
+
+        /**
+         * @brief Creates a right-click button and adds it to the test elements collection
+         * @return Pointer to the created button (owned by the fixture)
+         */
+        RightClickButton *createRightClickButton(int x, int y, int width, int height,
+                                                Color color, const std::string &name) {
+            auto button = std::make_unique<RightClickButton>(
+                SDL_Rect{x, y, width, height}, color, name);
+
+            // Add right-click event handler
+            context_->addEventHandler([button = button.get()](const SDL_Event& event) {
+                if (event.type == SDL_MOUSEBUTTONDOWN &&
+                    event.button.button == SDL_BUTTON_RIGHT) {
+                    int x = event.button.x;
+                    int y = event.button.y;
+                    if (button->isInside(x, y)) {
+                        button->handleRightClick();
+                    }
+                }
+            });
+
+            auto *rawPtr = button.get();
+            testElements_.push_back(std::move(button));
+            return rawPtr;
+        }
+
+        /**
+         * @brief Creates a scroll area and adds it to the test elements collection
+         * @return Pointer to the created scroll area (owned by the fixture)
+         */
+        ScrollArea *createScrollArea(int x, int y, int width, int height,
+                                    Color color, const std::string &name) {
+            auto area = std::make_unique<ScrollArea>(
+                SDL_Rect{x, y, width, height}, color, name);
+
+            // Add scroll event handler
+            context_->addEventHandler([area = area.get()](const SDL_Event& event) {
+                if (event.type == SDL_MOUSEWHEEL) {
+                    int mouseX, mouseY;
+                    SDL_GetMouseState(&mouseX, &mouseY);
+                    if (area->isInside(mouseX, mouseY)) {
+                        area->handleScroll(event.wheel.y);
+                    }
+                }
+            });
+
+            auto *rawPtr = area.get();
+            testElements_.push_back(std::move(area));
+            return rawPtr;
+        }
+
+        /**
          * @brief Runs the event loop for a specified duration
          * @param duration How long to process events
          */
@@ -87,10 +193,19 @@ namespace RobotTest {
         }
 
         /**
-             * @brief Performs a mouse drag operation
-             * @param startPoint Starting point in window coordinates
-             * @param endPoint Ending point in window coordinates
-             */
+         * @brief Converts screen coordinates to window coordinates
+         */
+        SDL_Point screenToWindow(int x, int y) const {
+            int windowX, windowY;
+            SDL_GetWindowPosition(context_->getWindow(), &windowX, &windowY);
+            return {x - windowX, y - windowY};
+        }
+
+        /**
+         * @brief Performs a mouse drag operation
+         * @param startPoint Starting point in window coordinates
+         * @param endPoint Ending point in window coordinates
+         */
         void performMouseDrag(const SDL_Point &startPoint, const SDL_Point &endPoint) {
             // Convert to screen coordinates
             Robot::Point startPos = windowToScreen(startPoint.x, startPoint.y);
@@ -106,7 +221,7 @@ namespace RobotTest {
             Robot::Mouse::DragSmooth(endPos);
 
             // Process events to ensure drag is applied
-            processEventsFor(std::chrono::milliseconds(1500));
+            processEventsFor(std::chrono::milliseconds(1000));
         }
 
         /**
@@ -140,6 +255,8 @@ namespace RobotTest {
             SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
             SDL_RenderDrawLine(renderer, localMouseX - 10, localMouseY, localMouseX + 10, localMouseY);
             SDL_RenderDrawLine(renderer, localMouseX, localMouseY - 10, localMouseX, localMouseY + 10);
+
+            // Draw coordinates text (would require SDL_ttf, so omitting)
         }
 
         std::unique_ptr<TestConfig> config_;
