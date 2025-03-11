@@ -38,7 +38,7 @@ add_custom_target(build_sdl_tests ALL DEPENDS ${SDL_TEST_NAME})
 
 # Add the SDL test as a test
 add_test(NAME SDLFunctionalTests
-        COMMAND ${SDL_TEST_NAME} --headless --run-tests
+        COMMAND ${SDL_TEST_NAME} --run-tests
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # Add another test configuration for interactive mode
