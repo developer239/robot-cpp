@@ -6,3 +6,6 @@
 # Build files
 /cmake-build-debug
 /example/cmake-build-debug
+
+
+/build
