@@ -2,24 +2,27 @@ name: Build
 
 on:
   push:
-    branches:
-      - master
+    branches: [ master ]
     paths:
       - 'src/**'
+      - 'tests/**'
+      - '.github/**'
+      - 'CMakeLists.txt'
   pull_request:
-    branches:
-      - master
+    branches: [ master ]
     paths:
       - 'src/**'
+      - 'tests/**'
+      - '.github/**'
+      - 'CMakeLists.txt'
 
 jobs:
   build:
-    runs-on: macos-12
+    runs-on: macos-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
-          submodules: 'recursive'
+          submodules: recursive
 
       - name: Install dependencies
         run: |

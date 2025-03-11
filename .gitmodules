@@ -1,3 +1,9 @@
 [submodule "externals/lodepng"]
 	path = externals/lodepng
 	url = https://github.com/lvandeve/lodepng
+[submodule "cmake/sdl2"]
+	path = cmake/sdl2
+	url = https://github.com/opeik/cmake-modern-findsdl2
+[submodule "externals/googletest"]
+	path = externals/googletest
+	url = https://github.com/google/googletest

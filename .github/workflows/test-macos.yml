@@ -1,0 +1,39 @@
+name: MacOS Tests (mouse)
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/**'
+      - 'CMakeLists.txt'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/**'
+      - 'CMakeLists.txt'
+
+jobs:
+  test-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: brew install cmake sdl2
+
+      - name: Configure
+        run: cmake -B build -DBUILD_ROBOT_TESTS=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: |
+          # macOS can run GUI apps in headless mode
+          build/bin/RobotCPPSDLTest --gtest_filter=-*InteractiveMode --ci-mode true
