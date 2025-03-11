@@ -1,6 +1,7 @@
 # Robot CPP
 
-[![macOS Tests](https://github.com/developer239/robot-cpp/actions/workflows/test-macos.yml/badge.svg)](https://github.com/developer239/robot-cpp/actions/workflows/test-macos.yml)
+![Build](https://github.com/developer239/robot-cpp/actions/workflows/build.yml/badge.svg)
+[![MacOS Tests](https://github.com/developer239/robot-cpp/actions/workflows/test-macos.yml/badge.svg)](https://github.com/developer239/robot-cpp/actions/workflows/test-macos.yml)
 [![Windows Tests](https://github.com/developer239/robot-cpp/actions/workflows/test-windows.yml/badge.svg)](https://github.com/developer239/robot-cpp/actions/workflows/test-windows.yml)
 
 This library is inspired by older unmaintained libraries like [octalmage/robotjs](https://github.com/octalmage/robotjs)
