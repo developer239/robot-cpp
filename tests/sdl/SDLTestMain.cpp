@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     }
 
     // Parse wait time
-    int waitTime = 2000; // Default 2 seconds
+    int waitTime = 2000;
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--wait-time" && i + 1 < argc) {
             waitTime = std::stoi(argv[i + 1]);
