@@ -9,13 +9,19 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Library name
 set(LIB_NAME RobotCPP)
 
-# Add GoogleTest
-add_subdirectory(externals/googletest)
-enable_testing()
+# Option to build tests (OFF by default)
+option(BUILD_ROBOT_TESTS "Build the RobotCPP tests" OFF)
 
-# Find SDL2 for tests
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/sdl2/")
-find_package(SDL2 REQUIRED)
+# Only find dependencies and add GoogleTest if tests are enabled
+if(BUILD_ROBOT_TESTS)
+    # Add GoogleTest
+    add_subdirectory(externals/googletest)
+    enable_testing()
+
+    # Find SDL2 for tests
+    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/sdl2/")
+    find_package(SDL2 REQUIRED)
+endif()
 
 # Compiler-specific options
 if(MSVC)
@@ -64,5 +70,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin)
 
-# Add the tests directory
-add_subdirectory(tests)
+# Add the tests directory only if tests are enabled
+if(BUILD_ROBOT_TESTS)
+    add_subdirectory(tests)
+endif()

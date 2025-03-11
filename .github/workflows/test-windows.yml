@@ -43,7 +43,7 @@ jobs:
 
       - name: Configure with vcpkg
         run: |
-          cmake -B build -DCMAKE_TOOLCHAIN_FILE="$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          cmake -B build -DCMAKE_TOOLCHAIN_FILE="$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake" -DBUILD_ROBOT_TESTS=ON
 
       - name: Build
         run: cmake --build build --config Release
