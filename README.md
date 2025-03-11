@@ -1,8 +1,7 @@
 # Robot CPP
 
-[![Robot CPP Tests](https://github.com/developer239/robot-cpp/actions/workflows/test.yml/badge.svg)](https://github.com/developer239/robot-cpp/actions/workflows/test.yml)
-![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
-![macOS](https://img.shields.io/badge/mac%20os-000000?style=for-the-badge&logo=macos&logoColor=F0F0F0)
+[![macOS Tests](https://github.com/developer239/robot-cpp/actions/workflows/test-macos.yml/badge.svg)](https://github.com/developer239/robot-cpp/actions/workflows/test-macos.yml)
+[![Windows Tests](https://github.com/developer239/robot-cpp/actions/workflows/test-windows.yml/badge.svg)](https://github.com/developer239/robot-cpp/actions/workflows/test-windows.yml)
 
 This library is inspired by older unmaintained libraries like [octalmage/robotjs](https://github.com/octalmage/robotjs)
 and [Robot/robot-js](https://github.com/Robot/robot-js). The goal is to provide cross-platform controls for various
