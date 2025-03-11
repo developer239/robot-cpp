@@ -3,249 +3,201 @@
 #include <SDL.h>
 #include <string>
 #include <functional>
+#include <string_view>
+#include <optional>
+#include <memory>
 
 namespace RobotTest {
 
-// A clickable test button
-class TestButton {
+// Struct for consistent color representation
+struct Color {
+    uint8_t r, g, b, a;
+
+    // Factory methods for common colors
+    static constexpr Color White() { return {255, 255, 255, 255}; }
+    static constexpr Color Black() { return {0, 0, 0, 255}; }
+    static constexpr Color Red() { return {255, 0, 0, 255}; }
+    static constexpr Color Green() { return {0, 255, 0, 255}; }
+    static constexpr Color Blue() { return {0, 0, 255, 255}; }
+    static constexpr Color Yellow() { return {255, 255, 0, 255}; }
+    static constexpr Color Orange() { return {255, 165, 0, 255}; }
+
+    // Darken color (factor between 0.0 and 1.0, where 0.0 is no change)
+    [[nodiscard]] constexpr Color darken(float factor) const noexcept {
+        const auto adjustment = [factor](uint8_t value) -> uint8_t {
+            return static_cast<uint8_t>(static_cast<float>(value) * (1.0f - factor));
+        };
+
+        return {
+            adjustment(r),
+            adjustment(g),
+            adjustment(b),
+            a
+        };
+    }
+
+    // Convert to SDL_Color
+    [[nodiscard]] SDL_Color toSDL() const noexcept {
+        return {r, g, b, a};
+    }
+};
+
+// Interface for all test visual elements
+class TestElement {
 public:
-    TestButton(SDL_Rect rect, SDL_Color color, const std::string& name)
-        : rect(rect), color(color), name(name), clicked(false) {}
+    virtual ~TestElement() = default;
 
-    void draw(SDL_Renderer* renderer) {
-        // Set color based on state
-        if (clicked) {
-            SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
-        } else {
-            SDL_SetRenderDrawColor(renderer, color.r/2, color.g/2, color.b/2, color.a);
-        }
+    virtual void draw(SDL_Renderer* renderer) const = 0;
+    [[nodiscard]] virtual bool isInside(int x, int y) const = 0;
+    virtual void reset() = 0;
 
-        SDL_RenderFillRect(renderer, &rect);
-
-        // Draw border
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        SDL_RenderDrawRect(renderer, &rect);
-    }
-
-    bool isInside(int x, int y) const {
-        return (x >= rect.x && x < rect.x + rect.w &&
-                y >= rect.y && y < rect.y + rect.h);
-    }
-
-    void handleClick() {
-        clicked = !clicked;
-    }
-
-    bool wasClicked() const { return clicked; }
-    void reset() { clicked = false; }
-
-    SDL_Rect getRect() const { return rect; }
-    std::string getName() const { return name; }
-
-private:
-    SDL_Rect rect;
-    SDL_Color color;
-    std::string name;
-    bool clicked;
+    [[nodiscard]] virtual SDL_Rect getRect() const = 0;
+    [[nodiscard]] virtual std::string_view getName() const = 0;
 };
 
 // A draggable element for testing drag operations
-class DragElement {
+class DragElement : public TestElement {
 public:
-    DragElement(SDL_Rect rect, SDL_Color color, const std::string& name)
-        : rect(rect), originalRect(rect), color(color), name(name), dragging(false) {}
+    DragElement(SDL_Rect rect, Color color, std::string name)
+        : rect_(rect), originalRect_(rect), color_(color), name_(std::move(name)), dragging_(false) {}
 
-    void draw(SDL_Renderer* renderer) {
-        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
-        SDL_RenderFillRect(renderer, &rect);
+    void draw(SDL_Renderer* renderer) const override {
+        // Set fill color
+        SDL_SetRenderDrawColor(renderer, color_.r, color_.g, color_.b, color_.a);
+        SDL_RenderFillRect(renderer, &rect_);
 
-        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-        SDL_RenderDrawRect(renderer, &rect);
+        // Draw border
+        SDL_SetRenderDrawColor(renderer, Color::White().r, Color::White().g, Color::White().b, Color::White().a);
+        SDL_RenderDrawRect(renderer, &rect_);
     }
 
-    bool isInside(int x, int y) const {
-        return (x >= rect.x && x < rect.x + rect.w &&
-                y >= rect.y && y < rect.y + rect.h);
+    [[nodiscard]] bool isInside(int x, int y) const override {
+        return (x >= rect_.x && x < rect_.x + rect_.w &&
+                y >= rect_.y && y < rect_.y + rect_.h);
     }
 
     void startDrag() {
-        dragging = true;
+        dragging_ = true;
     }
 
     void stopDrag() {
-        dragging = false;
+        dragging_ = false;
     }
 
     void moveTo(int x, int y) {
-        if (dragging) {
-            rect.x = x - rect.w/2;
-            rect.y = y - rect.h/2;
+        if (dragging_) {
+            rect_.x = x - rect_.w/2;
+            rect_.y = y - rect_.h/2;
         }
     }
 
-    void reset() {
-        rect = originalRect;
-        dragging = false;
+    void reset() override {
+        rect_ = originalRect_;
+        dragging_ = false;
     }
 
-    SDL_Rect getRect() const { return rect; }
-    std::string getName() const { return name; }
-    bool isDragging() const { return dragging; }
+    [[nodiscard]] SDL_Rect getRect() const override {
+        return rect_;
+    }
+
+    [[nodiscard]] std::string_view getName() const override {
+        return name_;
+    }
+
+    [[nodiscard]] bool isDragging() const {
+        return dragging_;
+    }
 
 private:
-    SDL_Rect rect;
-    SDL_Rect originalRect;
-    SDL_Color color;
-    std::string name;
-    bool dragging;
+    SDL_Rect rect_;
+    SDL_Rect originalRect_;
+    Color color_;
+    std::string name_;
+    bool dragging_;
 };
 
-// A text input field for keyboard testing
-class TextInput {
+// A clickable test button
+class TestButton : public TestElement {
 public:
-    TextInput(SDL_Rect rect, const std::string& name)
-        : rect(rect), name(name), text(""), active(false) {}
+    using ClickCallback = std::function<void()>;
 
-    void draw(SDL_Renderer* renderer) {
-        // Background
-        if (active) {
-            SDL_SetRenderDrawColor(renderer, 70, 70, 90, 255);
-        } else {
-            SDL_SetRenderDrawColor(renderer, 50, 50, 70, 255);
-        }
-        SDL_RenderFillRect(renderer, &rect);
+    TestButton(SDL_Rect rect, Color color, std::string name,
+               std::optional<ClickCallback> callback = std::nullopt)
+        : rect_(rect), color_(color), name_(std::move(name)),
+          clicked_(false), callback_(std::move(callback)) {}
 
-        // Border
-        SDL_SetRenderDrawColor(renderer, 200, 200, 220, 255);
-        SDL_RenderDrawRect(renderer, &rect);
-    }
+    void draw(SDL_Renderer* renderer) const override {
+        // Set color based on state
+        const Color drawColor = clicked_ ? color_ : color_.darken(0.5f);
 
-    bool isInside(int x, int y) const {
-        return (x >= rect.x && x < rect.x + rect.w &&
-                y >= rect.y && y < rect.y + rect.h);
-    }
-
-    void activate() {
-        active = true;
-    }
-
-    void deactivate() {
-        active = false;
-    }
-
-    void addChar(char c) {
-        text += c;
-    }
-
-    void removeChar() {
-        if (!text.empty()) {
-            text.pop_back();
-        }
-    }
-
-    std::string getText() const { return text; }
-    void setText(const std::string& newText) { text = newText; }
-    void reset() { text = ""; active = false; }
-    bool isActive() const { return active; }
-
-    SDL_Rect getRect() const { return rect; }
-    std::string getName() const { return name; }
-
-private:
-    SDL_Rect rect;
-    std::string name;
-    std::string text;
-    bool active;
-};
-
-// A color area for screen capture testing
-class ColorArea {
-public:
-    ColorArea(SDL_Rect rect, SDL_Color color, const std::string& name)
-        : rect(rect), color(color), name(name) {}
-
-    void draw(SDL_Renderer* renderer) {
-        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
-        SDL_RenderFillRect(renderer, &rect);
-    }
-
-    SDL_Rect getRect() const { return rect; }
-    SDL_Color getColor() const { return color; }
-    std::string getName() const { return name; }
-
-private:
-    SDL_Rect rect;
-    SDL_Color color;
-    std::string name;
-};
-
-// A scrollable area for mouse scroll testing
-class ScrollArea {
-public:
-    ScrollArea(SDL_Rect viewRect, int contentHeight, const std::string& name)
-        : viewRect(viewRect), contentHeight(contentHeight), name(name), scrollY(0) {}
-
-    void draw(SDL_Renderer* renderer) {
-        // Draw background
-        SDL_SetRenderDrawColor(renderer, 40, 40, 60, 255);
-        SDL_RenderFillRect(renderer, &viewRect);
+        SDL_SetRenderDrawColor(renderer, drawColor.r, drawColor.g, drawColor.b, drawColor.a);
+        SDL_RenderFillRect(renderer, &rect_);
 
         // Draw border
-        SDL_SetRenderDrawColor(renderer, 180, 180, 200, 255);
-        SDL_RenderDrawRect(renderer, &viewRect);
+        SDL_SetRenderDrawColor(renderer, Color::White().r, Color::White().g, Color::White().b, Color::White().a);
+        SDL_RenderDrawRect(renderer, &rect_);
+    }
 
-        // Draw content stripes (visible based on scroll position)
-        for (int y = 0; y < contentHeight; y += 40) {
-            SDL_Rect stripe = {
-                viewRect.x + 10,
-                viewRect.y + 10 + y - scrollY,
-                viewRect.w - 20,
-                20
-            };
+    [[nodiscard]] bool isInside(int x, int y) const override {
+        return (x >= rect_.x && x < rect_.x + rect_.w &&
+                y >= rect_.y && y < rect_.y + rect_.h);
+    }
 
-            // Only draw if visible in the viewport
-            if (stripe.y + stripe.h >= viewRect.y && stripe.y <= viewRect.y + viewRect.h) {
-                // Alternate colors
-                if ((y / 40) % 2 == 0) {
-                    SDL_SetRenderDrawColor(renderer, 100, 100, 150, 255);
-                } else {
-                    SDL_SetRenderDrawColor(renderer, 150, 150, 200, 255);
-                }
-                SDL_RenderFillRect(renderer, &stripe);
-            }
+    void handleClick() {
+        clicked_ = !clicked_;
+        if (callback_ && clicked_) {
+            (*callback_)();
         }
     }
 
-    void scroll(int amount) {
-        scrollY += amount;
-
-        // Limit scrolling
-        if (scrollY < 0) {
-            scrollY = 0;
-        } else {
-            int maxScroll = contentHeight - viewRect.h + 20;
-            if (maxScroll > 0 && scrollY > maxScroll) {
-                scrollY = maxScroll;
-            }
-        }
+    [[nodiscard]] bool wasClicked() const {
+        return clicked_;
     }
 
-    bool isInside(int x, int y) const {
-        return (x >= viewRect.x && x < viewRect.x + viewRect.w &&
-                y >= viewRect.y && y < viewRect.y + viewRect.h);
+    void reset() override {
+        clicked_ = false;
     }
 
-    int getScrollY() const { return scrollY; }
-    void reset() { scrollY = 0; }
+    [[nodiscard]] SDL_Rect getRect() const override {
+        return rect_;
+    }
 
-    SDL_Rect getViewRect() const { return viewRect; }
-    std::string getName() const { return name; }
+    [[nodiscard]] std::string_view getName() const override {
+        return name_;
+    }
 
 private:
-    SDL_Rect viewRect;
-    int contentHeight;
-    std::string name;
-    int scrollY;
+    SDL_Rect rect_;
+    Color color_;
+    std::string name_;
+    bool clicked_;
+    std::optional<ClickCallback> callback_;
 };
+
+// Factory function to create a unique_ptr to a drag element
+inline std::unique_ptr<DragElement> createDragElement(
+    int x, int y, int width, int height,
+    Color color, std::string name)
+{
+    return std::make_unique<DragElement>(
+        SDL_Rect{x, y, width, height},
+        color,
+        std::move(name)
+    );
+}
+
+// Factory function to create a unique_ptr to a button
+inline std::unique_ptr<TestButton> createButton(
+    int x, int y, int width, int height,
+    Color color, std::string name,
+    TestButton::ClickCallback callback = nullptr)
+{
+    return std::make_unique<TestButton>(
+        SDL_Rect{x, y, width, height},
+        color,
+        std::move(name),
+        callback
+    );
+}
 
 } // namespace RobotTest

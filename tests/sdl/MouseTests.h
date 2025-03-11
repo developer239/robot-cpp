@@ -7,8 +7,12 @@
 #include <vector>
 #include <atomic>
 #include <mutex>
+#include <memory>
+#include <string_view>
+#include <format>
 
 #include "TestElements.h"
+#include "TestContext.h"
 #include "../../src/Mouse.h"
 #include "../../src/Utils.h"
 
@@ -16,32 +20,39 @@ namespace RobotTest {
 
 // Test states for thread communication
 enum class TestState {
-    IDLE,
-    INITIALIZING,
-    MOVING_TO_START,
-    CLICKING,
-    PRESSING_MOUSE,
-    MOVING_TO_END,
-    RELEASING_MOUSE,
-    VALIDATING,
-    COMPLETED,
-    FAILED
+    Idle,
+    Initializing,
+    MovingToStart,
+    Clicking,
+    PressingMouse,
+    MovingToEnd,
+    ReleasingMouse,
+    Validating,
+    Completed,
+    Failed
 };
 
+/**
+ * @brief Class for testing mouse functionality
+ */
 class MouseTests {
 public:
-    MouseTests(SDL_Renderer* renderer, SDL_Window* window)
-        : renderer(renderer), window(window), testPassed(false),
-          testState(TestState::IDLE), testNeedsRendering(false) {
+    explicit MouseTests(TestContext& context)
+        : context_(context),
+          testState_(TestState::Idle),
+          testPassed_(false),
+          testNeedsRendering_(false) {
 
-        // Initialize drag elements for testing - make it larger and more visible
-        dragElements.push_back(DragElement(
-            {100, 200, 100, 100},
-            {255, 200, 0, 255},
-            "Drag Me"
-        ));
+        // Initialize drag elements
+        auto dragElement = createDragElement(
+            100, 200, 100, 100,  // x, y, width, height
+            Color::Yellow(),    // color
+            "Drag Me"           // name
+        );
 
-        // Add a heading with instructions
+        dragElements_.push_back(std::move(dragElement));
+
+        // Log test information
         std::cout << "=====================================" << std::endl;
         std::cout << "MOUSE DRAG TEST" << std::endl;
         std::cout << "=====================================" << std::endl;
@@ -51,17 +62,25 @@ public:
         std::cout << "2. Drag it 100px right and 50px down" << std::endl;
         std::cout << "3. Verify the square moved correctly" << std::endl;
         std::cout << "=====================================" << std::endl;
+
+        // Register event handler
+        context_.addEventHandler([this](const SDL_Event& event) {
+            handleEvent(event);
+        });
     }
 
-    void draw() {
-        // Draw drag elements
-        for (auto& dragElement : dragElements) {
-            dragElement.draw(renderer);
+    void draw() const {
+        // Get renderer from context
+        SDL_Renderer* renderer = context_.getRenderer();
+
+        // Draw all drag elements
+        for (const auto& element : dragElements_) {
+            element->draw(renderer);
         }
 
         // Get window position
         int windowX, windowY;
-        SDL_GetWindowPosition(window, &windowX, &windowY);
+        SDL_GetWindowPosition(context_.getWindow(), &windowX, &windowY);
 
         // Get global mouse position
         Robot::Point globalMousePos = Robot::Mouse::GetPosition();
@@ -75,251 +94,272 @@ public:
         SDL_RenderDrawLine(renderer, localMouseX-10, localMouseY, localMouseX+10, localMouseY);
         SDL_RenderDrawLine(renderer, localMouseX, localMouseY-10, localMouseX, localMouseY+10);
 
-        // Draw status box with info about test state
-        SDL_Rect posRect = {10, 10, 280, 40};
+        // Draw test status box
+        SDL_Rect statusRect = {10, 10, 280, 40};
         SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
-        SDL_RenderFillRect(renderer, &posRect);
+        SDL_RenderFillRect(renderer, &statusRect);
 
         // Draw border around status box
         SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
-        SDL_RenderDrawRect(renderer, &posRect);
+        SDL_RenderDrawRect(renderer, &statusRect);
+
+        // Draw test state
+        // TODO: Add text rendering
     }
 
     void handleEvent(const SDL_Event& event) {
-        if (event.type == SDL_MOUSEBUTTONDOWN) {
-            if (event.button.button == SDL_BUTTON_LEFT) {
-                int x = event.button.x;
-                int y = event.button.y;
+        switch (event.type) {
+            case SDL_MOUSEBUTTONDOWN:
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    int x = event.button.x;
+                    int y = event.button.y;
 
-                // Handle drag starts
-                for (auto& dragElement : dragElements) {
-                    if (dragElement.isInside(x, y)) {
-                        dragElement.startDrag();
+                    // Handle drag starts
+                    for (auto& element : dragElements_) {
+                        if (element->isInside(x, y)) {
+                            static_cast<DragElement*>(element.get())->startDrag();
+                        }
                     }
                 }
-            }
-        }
-        else if (event.type == SDL_MOUSEBUTTONUP) {
-            if (event.button.button == SDL_BUTTON_LEFT) {
-                // Stop any dragging
-                for (auto& dragElement : dragElements) {
-                    if (dragElement.isDragging()) {
-                        dragElement.stopDrag();
+                break;
+
+            case SDL_MOUSEBUTTONUP:
+                if (event.button.button == SDL_BUTTON_LEFT) {
+                    // Stop any dragging
+                    for (auto& element : dragElements_) {
+                        auto* dragElement = static_cast<DragElement*>(element.get());
+                        if (dragElement->isDragging()) {
+                            dragElement->stopDrag();
+                        }
                     }
                 }
-            }
-        }
-        else if (event.type == SDL_MOUSEMOTION) {
-            int x = event.motion.x;
-            int y = event.motion.y;
+                break;
 
-            // Update draggable elements
-            for (auto& dragElement : dragElements) {
-                if (dragElement.isDragging()) {
-                    dragElement.moveTo(x, y);
+            case SDL_MOUSEMOTION:
+                {
+                    int x = event.motion.x;
+                    int y = event.motion.y;
+
+                    // Update draggable elements
+                    for (auto& element : dragElements_) {
+                        auto* dragElement = static_cast<DragElement*>(element.get());
+                        if (dragElement->isDragging()) {
+                            dragElement->moveTo(x, y);
+                        }
+                    }
                 }
-            }
+                break;
         }
     }
 
     void reset() {
-        for (auto& dragElement : dragElements) {
-            dragElement.reset();
+        for (auto& element : dragElements_) {
+            element->reset();
         }
     }
 
     // Convert window coordinates to global screen coordinates
-    Robot::Point windowToScreen(int x, int y) {
+    [[nodiscard]] Robot::Point windowToScreen(int x, int y) const {
         int windowX, windowY;
-        SDL_GetWindowPosition(window, &windowX, &windowY);
+        SDL_GetWindowPosition(context_.getWindow(), &windowX, &windowY);
         return {x + windowX, y + windowY};
-    }
-
-    // This function runs in a separate thread and performs the mouse actions
-    void runDragTestThread() {
-        std::cout << "Starting mouse drag test in a thread..." << std::endl;
-
-        // Set initial state
-        testState = TestState::INITIALIZING;
-        testNeedsRendering = true;
-
-        // Wait for main thread to process this state
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-        // Get first drag element position
-        int startX = 0, startY = 0, expectedX = 0, expectedY = 0;
-        {
-            std::lock_guard<std::mutex> lock(testMutex);
-
-            if (dragElements.empty()) {
-                std::cout << "No drag elements to test" << std::endl;
-                testState = TestState::FAILED;
-                testNeedsRendering = true;
-                return;
-            }
-
-            auto& dragElement = dragElements[0];
-            SDL_Rect startRect = dragElement.getRect();
-
-            // Start position (center of element) in window coordinates
-            startX = startRect.x + startRect.w/2;
-            startY = startRect.y + startRect.h/2;
-
-            // Calculate expected end position
-            expectedX = startRect.x + 100; // 100px to the right
-            expectedY = startRect.y + 50;  // 50px down
-        }
-
-        // End position for drag
-        int endX = startX + 100;
-        int endY = startY + 50;
-
-        // Normal mode - use Robot library for real mouse automation
-        // Convert to screen coordinates
-        Robot::Point startPos = windowToScreen(startX, startY);
-        Robot::Point endPos = windowToScreen(endX, endY);
-
-        std::cout << "Start position (screen): (" << startPos.x << ", " << startPos.y << ")" << std::endl;
-        std::cout << "End position (screen): (" << endPos.x << ", " << endPos.y << ")" << std::endl;
-
-        // Move to start position
-        testState = TestState::MOVING_TO_START;
-        testNeedsRendering = true;
-        std::cout << "Moving to start position..." << std::endl;
-        Robot::Mouse::Move(startPos);
-        Robot::delay(300);
-
-        // Click to ensure element is ready for dragging
-        testState = TestState::CLICKING;
-        testNeedsRendering = true;
-        std::cout << "Clicking to select drag element..." << std::endl;
-        Robot::Mouse::Click(Robot::MouseButton::LEFT_BUTTON);
-        Robot::delay(300);
-
-        // Perform drag operation with states for main thread rendering
-        std::cout << "Starting drag operation..." << std::endl;
-
-        // Press the mouse button
-        testState = TestState::PRESSING_MOUSE;
-        testNeedsRendering = true;
-        Robot::Mouse::ToggleButton(true, Robot::MouseButton::LEFT_BUTTON);
-        Robot::delay(300);
-
-        // Move to the target position
-        testState = TestState::MOVING_TO_END;
-        testNeedsRendering = true;
-        std::cout << "Moving to end position..." << std::endl;
-        Robot::Mouse::Move(endPos);
-        Robot::delay(300);
-
-        // Release the mouse button
-        testState = TestState::RELEASING_MOUSE;
-        testNeedsRendering = true;
-        Robot::Mouse::ToggleButton(false, Robot::MouseButton::LEFT_BUTTON);
-        Robot::delay(500); // Give time for the drag to complete
-
-        // Validate results
-        testState = TestState::VALIDATING;
-        testNeedsRendering = true;
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-        // Let the main thread process events before evaluating results
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-        // Validate the results (in a thread-safe way)
-        {
-            std::lock_guard<std::mutex> lock(testMutex);
-
-            if (dragElements.empty()) {
-                testPassed = false;
-                testState = TestState::FAILED;
-                testNeedsRendering = true;
-                return;
-            }
-
-            auto& dragElement = dragElements[0];
-            SDL_Rect currentRect = dragElement.getRect();
-
-            std::cout << "Element position after drag: (" << currentRect.x << ", " << currentRect.y << ")" << std::endl;
-
-            // Check if element was dragged (should be close to the target position)
-            const int tolerance = 20; // pixels
-
-            if (abs(currentRect.x - expectedX) > tolerance ||
-                abs(currentRect.y - expectedY) > tolerance) {
-                std::cout << "Drag test failed. Expected pos: (" << expectedX << ", " << expectedY
-                          << "), Actual: (" << currentRect.x << ", " << currentRect.y << ")" << std::endl;
-                testPassed = false;
-                testState = TestState::FAILED;
-            } else {
-                std::cout << "Mouse dragging test passed" << std::endl;
-                testPassed = true;
-                testState = TestState::COMPLETED;
-            }
-        }
-
-        testNeedsRendering = true;
     }
 
     // Start test in a separate thread and return immediately
     void startDragTest() {
         // Reset test state
-        testState = TestState::IDLE;
-        testPassed = false;
-        testNeedsRendering = true;
+        testState_ = TestState::Idle;
+        testPassed_ = false;
+        testNeedsRendering_ = true;
 
-        // Start the test thread
-        if (testThread.joinable()) {
-            testThread.join();
+        // Start the test thread, joining any previous thread first
+        if (testThread_.joinable()) {
+            testThread_.join();
         }
 
-        testThread = std::thread(&MouseTests::runDragTestThread, this);
+        testThread_ = std::thread(&MouseTests::runDragTestThread, this);
+    }
+
+    // Run all tests
+    bool runAllTests() {
+        startDragTest();
+        return true; // Return value not used - test status is checked separately
     }
 
     // Process any test-related events/updates in the main thread
     void updateFromMainThread() {
-        // No SDL API calls in test thread - just handle any pending state changes
-        if (testNeedsRendering) {
-            testNeedsRendering = false;
+        if (testNeedsRendering_) {
+            testNeedsRendering_ = false;
             // Main thread has now processed this state
         }
     }
 
     // Check if test is completed
-    bool isTestCompleted() const {
-        return (testState == TestState::COMPLETED || testState == TestState::FAILED);
+    [[nodiscard]] bool isTestCompleted() const {
+        return (testState_ == TestState::Completed || testState_ == TestState::Failed);
     }
 
     // Get test result
-    bool getTestResult() const {
-        return testPassed;
+    [[nodiscard]] bool getTestResult() const {
+        return testPassed_;
     }
 
     // Clean up test thread
-    void cleanup() {
-        if (testThread.joinable()) {
-            testThread.join();
+    void cleanup() noexcept {
+        try {
+            if (testThread_.joinable()) {
+                testThread_.join();
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error cleaning up test thread: " << e.what() << std::endl;
         }
     }
 
-    bool runAllTests() {
-        startDragTest();
+private:
+    // This function runs in a separate thread and performs the mouse actions
+    void runDragTestThread() {
+        try {
+            std::cout << "Starting mouse drag test in a thread..." << std::endl;
 
-        // Main thread will handle SDL events and rendering
-        // This function will be used by RobotTestApp
+            // Set initial state
+            testState_ = TestState::Initializing;
+            testNeedsRendering_ = true;
 
-        return true; // Return value not used - test status is checked separately
+            // Wait for main thread to process this state
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+            // Get first drag element position
+            int startX = 0, startY = 0, expectedX = 0, expectedY = 0;
+
+            {
+                std::lock_guard<std::mutex> lock(testMutex_);
+
+                if (dragElements_.empty()) {
+                    std::cout << "No drag elements to test" << std::endl;
+                    testState_ = TestState::Failed;
+                    testNeedsRendering_ = true;
+                    return;
+                }
+
+                auto& dragElement = dragElements_[0];
+                SDL_Rect startRect = dragElement->getRect();
+
+                // Start position (center of element) in window coordinates
+                startX = startRect.x + startRect.w/2;
+                startY = startRect.y + startRect.h/2;
+
+                // Calculate expected end position
+                const auto& config = context_.getConfig();
+                expectedX = startRect.x + config.dragOffsetX;
+                expectedY = startRect.y + config.dragOffsetY;
+            }
+
+            // End position for drag
+            const auto& config = context_.getConfig();
+            int endX = startX + config.dragOffsetX;
+            int endY = startY + config.dragOffsetY;
+
+            // Convert to screen coordinates
+            Robot::Point startPos = windowToScreen(startX, startY);
+            Robot::Point endPos = windowToScreen(endX, endY);
+
+            std::cout << std::format("Start position (screen): ({}, {})", startPos.x, startPos.y) << std::endl;
+            std::cout << std::format("End position (screen): ({}, {})", endPos.x, endPos.y) << std::endl;
+
+            // Move to start position
+            testState_ = TestState::MovingToStart;
+            testNeedsRendering_ = true;
+            std::cout << "Moving to start position..." << std::endl;
+            Robot::Mouse::Move(startPos);
+            Robot::delay(static_cast<unsigned int>(config.actionDelay.count()));
+
+            // Click to ensure element is ready for dragging
+            testState_ = TestState::Clicking;
+            testNeedsRendering_ = true;
+            std::cout << "Clicking to select drag element..." << std::endl;
+            Robot::Mouse::Click(Robot::MouseButton::LEFT_BUTTON);
+            Robot::delay(static_cast<unsigned int>(config.actionDelay.count()));
+
+            // Perform drag operation with states for main thread rendering
+            std::cout << "Starting drag operation..." << std::endl;
+
+            // Press the mouse button
+            testState_ = TestState::PressingMouse;
+            testNeedsRendering_ = true;
+            Robot::Mouse::ToggleButton(true, Robot::MouseButton::LEFT_BUTTON);
+            Robot::delay(static_cast<unsigned int>(config.actionDelay.count()));
+
+            // Move to the target position
+            testState_ = TestState::MovingToEnd;
+            testNeedsRendering_ = true;
+            std::cout << "Moving to end position..." << std::endl;
+            Robot::Mouse::Move(endPos);
+            Robot::delay(static_cast<unsigned int>(config.actionDelay.count()));
+
+            // Release the mouse button
+            testState_ = TestState::ReleasingMouse;
+            testNeedsRendering_ = true;
+            Robot::Mouse::ToggleButton(false, Robot::MouseButton::LEFT_BUTTON);
+            Robot::delay(500); // Give time for the drag to complete
+
+            // Validate results
+            testState_ = TestState::Validating;
+            testNeedsRendering_ = true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+            // Let the main thread process events before evaluating results
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+            // Validate the results (in a thread-safe way)
+            {
+                std::lock_guard<std::mutex> lock(testMutex_);
+
+                if (dragElements_.empty()) {
+                    testPassed_ = false;
+                    testState_ = TestState::Failed;
+                    testNeedsRendering_ = true;
+                    return;
+                }
+
+                auto& dragElement = dragElements_[0];
+                SDL_Rect currentRect = dragElement->getRect();
+
+                std::cout << std::format("Element position after drag: ({}, {})",
+                    currentRect.x, currentRect.y) << std::endl;
+
+                // Check if element was dragged (should be close to the target position)
+                const int tolerance = config.positionTolerance;
+
+                if (abs(currentRect.x - expectedX) > tolerance ||
+                    abs(currentRect.y - expectedY) > tolerance) {
+                    std::cout << std::format("Drag test failed. Expected pos: ({}, {}), Actual: ({}, {})",
+                        expectedX, expectedY, currentRect.x, currentRect.y) << std::endl;
+                    testPassed_ = false;
+                    testState_ = TestState::Failed;
+                } else {
+                    std::cout << "Mouse dragging test passed" << std::endl;
+                    testPassed_ = true;
+                    testState_ = TestState::Completed;
+                }
+            }
+
+            testNeedsRendering_ = true;
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Exception in drag test: " << e.what() << std::endl;
+            testPassed_ = false;
+            testState_ = TestState::Failed;
+            testNeedsRendering_ = true;
+        }
     }
 
-private:
-    SDL_Renderer* renderer;
-    SDL_Window* window;
-    std::vector<DragElement> dragElements;
-    std::thread testThread;
-    std::atomic<bool> testPassed;
-    std::atomic<TestState> testState;
-    std::atomic<bool> testNeedsRendering;
-    std::mutex testMutex;
+    TestContext& context_;
+    std::vector<std::unique_ptr<TestElement>> dragElements_;
+    std::thread testThread_;
+    std::atomic<TestState> testState_;
+    std::atomic<bool> testPassed_;
+    std::atomic<bool> testNeedsRendering_;
+    std::mutex testMutex_;
 };
 
 } // namespace RobotTest

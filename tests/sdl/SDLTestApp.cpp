@@ -1,126 +1,119 @@
 #include <SDL.h>
 #include <iostream>
-#include <string>
-#include <vector>
-#include <chrono>
-#include <thread>
 #include <memory>
-#include <atomic>
+#include <chrono>
+#include <stdexcept>
+#include <format>
 
 #include "TestElements.h"
 #include "MouseTests.h"
+#include "TestContext.h"
+#include "TestConfig.h"
 
-// Include Robot library headers
 #include "../../src/Mouse.h"
 #include "../../src/Utils.h"
 
+#include <gtest/gtest.h>
+
 using namespace RobotTest;
 
+/**
+ * @brief Main application class for Robot CPP testing
+ */
 class RobotTestApp {
 public:
-    RobotTestApp(int argc, char** argv, int width = 800, int height = 600)
-        : width(width), height(height), running(false) {
+    explicit RobotTestApp(const TestConfig& config)
+        : config_(config),
+          running_(false) {
 
-        // Initialize SDL
-        if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-            std::cerr << "Could not initialize SDL: " << SDL_GetError() << std::endl;
-            exit(1);
+        try {
+            // Initialize testing context (SDL, window, renderer)
+            context_ = std::make_unique<TestContext>(config_);
+
+            // Initialize test modules
+            mouseTests_ = std::make_unique<MouseTests>(*context_);
         }
-
-        // Create window
-        window = SDL_CreateWindow(
-            "Robot CPP Testing Framework",
-            SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-            width, height,
-            SDL_WINDOW_SHOWN
-        );
-
-        if (!window) {
-            std::cerr << "Could not create window: " << SDL_GetError() << std::endl;
-            exit(1);
+        catch (const std::exception& e) {
+            std::cerr << "Failed to initialize application: " << e.what() << std::endl;
+            throw;
         }
-
-        // Create renderer with VSYNC
-        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-
-        if (!renderer) {
-            std::cerr << "Could not create renderer: " << SDL_GetError() << std::endl;
-            exit(1);
-        }
-
-        // Initialize mouse test module
-        mouseTests = std::make_unique<MouseTests>(renderer, window);
-
-        // Make sure the window is visible and on top
-        SDL_RaiseWindow(window);
-        SDL_SetWindowPosition(window, 50, 50);
     }
 
     ~RobotTestApp() {
-        // Clean up any running tests
-        if (mouseTests) {
-            mouseTests->cleanup();
+        // Cleanup in reverse order of creation
+        if (mouseTests_) {
+            mouseTests_->cleanup();
         }
 
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-        SDL_Quit();
+        // TestContext destructor will handle SDL cleanup
     }
 
+    // Run in interactive mode - event loop
     void run() {
-        running = true;
+        running_ = true;
 
-        while (running) {
-            handleEvents();
-            render();
-            SDL_Delay(16); // ~60 FPS
+        std::cout << "Running in interactive mode. Close window to exit." << std::endl;
+
+        while (running_) {
+            // Process events
+            context_->handleEvents(running_);
+
+            // Render frame
+            context_->renderFrame([this](SDL_Renderer* renderer) {
+                renderUI(renderer);
+            });
+
+            // Cap frame rate
+            SDL_Delay(static_cast<Uint32>(config_.frameDelay.count()));
         }
     }
 
+    // Run automated tests
     bool runTests() {
         bool allTestsPassed = true;
 
         std::cout << "===== Robot CPP Test Suite =====" << std::endl;
 
-        // Make sure the window is properly initialized and visible
-        prepareForTests();
+        // Prepare the window for testing
+        context_->prepareForTests();
 
-        // Run mouse tests - only drag test
+        // Run mouse tests
         std::cout << "\n----- Mouse Drag Test -----" << std::endl;
 
         // Start the test in a separate thread
-        mouseTests->startDragTest();
+        mouseTests_->startDragTest();
 
         // Run SDL event loop while tests are executing
         auto startTime = std::chrono::steady_clock::now();
-        auto timeout = std::chrono::seconds(30); // 30 seconds timeout
 
         std::cout << "Running SDL event loop during test execution..." << std::endl;
 
         // Keep going until the test is completed or timeout
-        while (!mouseTests->isTestCompleted()) {
+        while (!mouseTests_->isTestCompleted()) {
             // Process SDL events - THIS MUST BE ON MAIN THREAD
-            handleEvents();
+            context_->handleEvents(running_);
 
             // Update test state from main thread
-            mouseTests->updateFromMainThread();
+            mouseTests_->updateFromMainThread();
 
-            // Render the screen
-            render();
+            // Render the screen with all test elements
+            context_->renderFrame([this](SDL_Renderer* renderer) {
+                renderUI(renderer);
+            });
 
             // Check if we've timed out
             auto elapsed = std::chrono::steady_clock::now() - startTime;
-            if (elapsed > timeout) {
+            if (elapsed > config_.testTimeout) {
                 std::cout << "Test execution timed out!" << std::endl;
                 break;
             }
 
             // Don't hog the CPU
-            SDL_Delay(16); // ~60 FPS
+            SDL_Delay(static_cast<Uint32>(config_.frameDelay.count()));
         }
 
         // Get test result
-        bool testPassed = mouseTests->getTestResult();
+        bool testPassed = mouseTests_->getTestResult();
 
         if (!testPassed) {
             std::cout << "❌ Mouse drag test failed" << std::endl;
@@ -130,7 +123,7 @@ public:
         }
 
         // Make sure we clean up the test thread
-        mouseTests->cleanup();
+        mouseTests_->cleanup();
 
         // Final results
         std::cout << "\n===== Test Results =====" << std::endl;
@@ -140,103 +133,53 @@ public:
     }
 
 private:
-    void handleEvents() {
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                running = false;
-            }
-
-            // Forward events to mouse test module
-            mouseTests->handleEvent(event);
-        }
-    }
-
-    void render() {
-        // Clear screen with a dark gray background
-        SDL_SetRenderDrawColor(renderer, 40, 40, 40, 255);
-        SDL_RenderClear(renderer);
-
-        // Draw title
-        SDL_Rect titleRect = {0, 10, width, 40};
+    // Render all UI elements
+    void renderUI(SDL_Renderer* renderer) {
+        // Draw title bar
+        SDL_Rect titleRect = {0, 10, config_.windowWidth, 40};
         SDL_SetRenderDrawColor(renderer, 60, 60, 60, 255);
         SDL_RenderFillRect(renderer, &titleRect);
 
         // Draw mouse test elements
-        mouseTests->draw();
-
-        // Present render to the screen
-        SDL_RenderPresent(renderer);
+        mouseTests_->draw();
     }
 
-    void prepareForTests() {
-        std::cout << "Preparing test environment..." << std::endl;
-
-        // Make window visible and ensure focus
-        SDL_ShowWindow(window);
-        SDL_SetWindowPosition(window, 50, 50);
-        SDL_RaiseWindow(window);
-
-        // Render several frames to ensure the window is properly displayed
-        for (int i = 0; i < 5; i++) {
-            render();
-            SDL_Delay(100);
-        }
-
-        // Process any pending events
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            // Just drain the event queue
-        }
-
-        // Additional delay to ensure window is ready
-        SDL_Delay(500);
-
-        // Get and display window position for debugging
-        int x, y;
-        SDL_GetWindowPosition(window, &x, &y);
-        std::cout << "Window position: (" << x << ", " << y << ")" << std::endl;
-    }
-
-    int width, height;
-    bool running;
-    SDL_Window* window;
-    SDL_Renderer* renderer;
-
-    std::unique_ptr<MouseTests> mouseTests;
+    TestConfig config_;
+    std::unique_ptr<TestContext> context_;
+    std::unique_ptr<MouseTests> mouseTests_;
+    bool running_;
 };
 
+// Main entry point
 int main(int argc, char* argv[]) {
-    bool runTests = false;
-    int waitTime = 2000; // Default wait time in ms before tests
+    // Initialize Google Test
+    ::testing::InitGoogleTest(&argc, argv);
 
-    // Parse command line arguments
-    for (int i = 1; i < argc; i++) {
-        std::string arg = argv[i];
-        if (arg == "--run-tests") {
-            runTests = true;
-        }
-        else if (arg == "--wait-time" && i + 1 < argc) {
-            waitTime = std::stoi(argv[i + 1]);
-            i++;
+    try {
+        // Parse command line config
+        TestConfig config = TestConfig::fromCommandLine(argc, argv);
+
+        // Create the test application
+        RobotTestApp app(config);
+
+        // Either run tests or interactive mode
+        if (config.runTests) {
+            std::cout << "Initializing test window..." << std::endl;
+
+            // Wait before starting tests to ensure window is ready
+            std::cout << std::format("Waiting {:.1f} seconds before starting tests...",
+                                    config.initialWaitTime.count() / 1000.0) << std::endl;
+            SDL_Delay(static_cast<Uint32>(config.initialWaitTime.count()));
+
+            bool success = app.runTests();
+            return success ? 0 : 1;
+        } else {
+            app.run();
+            return 0;
         }
     }
-
-    // Create test application
-    RobotTestApp app(argc, argv, 800, 600);
-
-    // Either run tests or interactive mode
-    if (runTests) {
-        std::cout << "Initializing test window..." << std::endl;
-
-        // Wait before starting tests to ensure window is ready
-        std::cout << "Waiting " << waitTime/1000.0 << " seconds before starting tests..." << std::endl;
-        SDL_Delay(waitTime);
-
-        bool success = app.runTests();
-        return success ? 0 : 1;
-    } else {
-        app.run();
-        return 0;
+    catch (const std::exception& e) {
+        std::cerr << "Fatal error: " << e.what() << std::endl;
+        return 1;
     }
 }
