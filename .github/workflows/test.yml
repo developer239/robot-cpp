@@ -36,11 +36,29 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Configure
-        run: cmake -B build
+      - name: Install vcpkg and SDL2
+        run: |
+          # Clone vcpkg
+          git clone https://github.com/Microsoft/vcpkg.git
+          cd vcpkg
+          
+          # Bootstrap vcpkg
+          .\bootstrap-vcpkg.bat
+          
+          # Install SDL2
+          .\vcpkg install sdl2:x64-windows
+          
+          # Integrate with Visual Studio
+          .\vcpkg integrate install
+          
+          cd ..
+
+      - name: Configure with vcpkg
+        run: |
+          cmake -B build -DCMAKE_TOOLCHAIN_FILE="$PWD/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
       - name: Build
         run: cmake --build build --config Release
 
       - name: Test
-        run: build/bin/Release/RobotCPPSDLTest.exe --ci-mode true
+        run: build/bin/Release/RobotCPPSDLTest.exe --gtest_filter=-*InteractiveMode --ci-mode true
