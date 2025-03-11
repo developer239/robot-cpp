@@ -30,14 +30,9 @@ enum class TestState {
 
 class MouseTests {
 public:
-    MouseTests(SDL_Renderer* renderer, SDL_Window* window, bool ciMode = false)
+    MouseTests(SDL_Renderer* renderer, SDL_Window* window)
         : renderer(renderer), window(window), testPassed(false),
-          testState(TestState::IDLE), testNeedsRendering(false),
-          ciMode(ciMode) {
-
-        if (ciMode) {
-            std::cout << "MouseTests running in CI mode - will use simulated mouse events" << std::endl;
-        }
+          testState(TestState::IDLE), testNeedsRendering(false) {
 
         // Initialize drag elements for testing - make it larger and more visible
         dragElements.push_back(DragElement(
@@ -64,24 +59,21 @@ public:
             dragElement.draw(renderer);
         }
 
-        // In CI mode, we don't need to draw mouse position
-        if (!ciMode) {
-            // Get window position
-            int windowX, windowY;
-            SDL_GetWindowPosition(window, &windowX, &windowY);
+        // Get window position
+        int windowX, windowY;
+        SDL_GetWindowPosition(window, &windowX, &windowY);
 
-            // Get global mouse position
-            Robot::Point globalMousePos = Robot::Mouse::GetPosition();
+        // Get global mouse position
+        Robot::Point globalMousePos = Robot::Mouse::GetPosition();
 
-            // Calculate local mouse position (relative to window)
-            int localMouseX = globalMousePos.x - windowX;
-            int localMouseY = globalMousePos.y - windowY;
+        // Calculate local mouse position (relative to window)
+        int localMouseX = globalMousePos.x - windowX;
+        int localMouseY = globalMousePos.y - windowY;
 
-            // Draw mouse position indicator - a red crosshair at the current mouse position
-            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-            SDL_RenderDrawLine(renderer, localMouseX-10, localMouseY, localMouseX+10, localMouseY);
-            SDL_RenderDrawLine(renderer, localMouseX, localMouseY-10, localMouseX, localMouseY+10);
-        }
+        // Draw mouse position indicator - a red crosshair at the current mouse position
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+        SDL_RenderDrawLine(renderer, localMouseX-10, localMouseY, localMouseX+10, localMouseY);
+        SDL_RenderDrawLine(renderer, localMouseX, localMouseY-10, localMouseX, localMouseY+10);
 
         // Draw status box with info about test state
         SDL_Rect posRect = {10, 10, 280, 40};
@@ -143,38 +135,6 @@ public:
         return {x + windowX, y + windowY};
     }
 
-    // Directly inject mouse events for CI mode
-    void injectMouseEvent(int type, int x, int y, int button = SDL_BUTTON_LEFT) {
-        SDL_Event event;
-
-        switch (type) {
-            case SDL_MOUSEBUTTONDOWN:
-                event.type = SDL_MOUSEBUTTONDOWN;
-                event.button.button = button;
-                event.button.x = x;
-                event.button.y = y;
-                event.button.state = SDL_PRESSED;
-                break;
-
-            case SDL_MOUSEBUTTONUP:
-                event.type = SDL_MOUSEBUTTONUP;
-                event.button.button = button;
-                event.button.x = x;
-                event.button.y = y;
-                event.button.state = SDL_RELEASED;
-                break;
-
-            case SDL_MOUSEMOTION:
-                event.type = SDL_MOUSEMOTION;
-                event.motion.x = x;
-                event.motion.y = y;
-                event.motion.state = SDL_PRESSED;
-                break;
-        }
-
-        SDL_PushEvent(&event);
-    }
-
     // This function runs in a separate thread and performs the mouse actions
     void runDragTestThread() {
         std::cout << "Starting mouse drag test in a thread..." << std::endl;
@@ -214,82 +174,49 @@ public:
         int endX = startX + 100;
         int endY = startY + 50;
 
-        if (ciMode) {
-            // In CI mode, directly inject SDL events
-            std::cout << "CI Mode: Using simulated mouse events" << std::endl;
+        // Normal mode - use Robot library for real mouse automation
+        // Convert to screen coordinates
+        Robot::Point startPos = windowToScreen(startX, startY);
+        Robot::Point endPos = windowToScreen(endX, endY);
 
-            testState = TestState::MOVING_TO_START;
-            testNeedsRendering = true;
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::cout << "Start position (screen): (" << startPos.x << ", " << startPos.y << ")" << std::endl;
+        std::cout << "End position (screen): (" << endPos.x << ", " << endPos.y << ")" << std::endl;
 
-            testState = TestState::CLICKING;
-            testNeedsRendering = true;
-            injectMouseEvent(SDL_MOUSEMOTION, startX, startY);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            injectMouseEvent(SDL_MOUSEBUTTONDOWN, startX, startY);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            injectMouseEvent(SDL_MOUSEBUTTONUP, startX, startY);
-            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        // Move to start position
+        testState = TestState::MOVING_TO_START;
+        testNeedsRendering = true;
+        std::cout << "Moving to start position..." << std::endl;
+        Robot::Mouse::Move(startPos);
+        Robot::delay(300);
 
-            testState = TestState::PRESSING_MOUSE;
-            testNeedsRendering = true;
-            injectMouseEvent(SDL_MOUSEBUTTONDOWN, startX, startY);
-            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        // Click to ensure element is ready for dragging
+        testState = TestState::CLICKING;
+        testNeedsRendering = true;
+        std::cout << "Clicking to select drag element..." << std::endl;
+        Robot::Mouse::Click(Robot::MouseButton::LEFT_BUTTON);
+        Robot::delay(300);
 
-            testState = TestState::MOVING_TO_END;
-            testNeedsRendering = true;
-            injectMouseEvent(SDL_MOUSEMOTION, endX, endY);
-            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        // Perform drag operation with states for main thread rendering
+        std::cout << "Starting drag operation..." << std::endl;
 
-            testState = TestState::RELEASING_MOUSE;
-            testNeedsRendering = true;
-            injectMouseEvent(SDL_MOUSEBUTTONUP, endX, endY);
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        } else {
-            // Normal mode - use Robot library for real mouse automation
-            // Convert to screen coordinates
-            Robot::Point startPos = windowToScreen(startX, startY);
-            Robot::Point endPos = windowToScreen(endX, endY);
+        // Press the mouse button
+        testState = TestState::PRESSING_MOUSE;
+        testNeedsRendering = true;
+        Robot::Mouse::ToggleButton(true, Robot::MouseButton::LEFT_BUTTON);
+        Robot::delay(300);
 
-            std::cout << "Start position (screen): (" << startPos.x << ", " << startPos.y << ")" << std::endl;
-            std::cout << "End position (screen): (" << endPos.x << ", " << endPos.y << ")" << std::endl;
+        // Move to the target position
+        testState = TestState::MOVING_TO_END;
+        testNeedsRendering = true;
+        std::cout << "Moving to end position..." << std::endl;
+        Robot::Mouse::Move(endPos);
+        Robot::delay(300);
 
-            // Move to start position
-            testState = TestState::MOVING_TO_START;
-            testNeedsRendering = true;
-            std::cout << "Moving to start position..." << std::endl;
-            Robot::Mouse::Move(startPos);
-            Robot::delay(300);
-
-            // Click to ensure element is ready for dragging
-            testState = TestState::CLICKING;
-            testNeedsRendering = true;
-            std::cout << "Clicking to select drag element..." << std::endl;
-            Robot::Mouse::Click(Robot::MouseButton::LEFT_BUTTON);
-            Robot::delay(300);
-
-            // Perform drag operation with states for main thread rendering
-            std::cout << "Starting drag operation..." << std::endl;
-
-            // Press the mouse button
-            testState = TestState::PRESSING_MOUSE;
-            testNeedsRendering = true;
-            Robot::Mouse::ToggleButton(true, Robot::MouseButton::LEFT_BUTTON);
-            Robot::delay(300);
-
-            // Move to the target position
-            testState = TestState::MOVING_TO_END;
-            testNeedsRendering = true;
-            std::cout << "Moving to end position..." << std::endl;
-            Robot::Mouse::Move(endPos);
-            Robot::delay(300);
-
-            // Release the mouse button
-            testState = TestState::RELEASING_MOUSE;
-            testNeedsRendering = true;
-            Robot::Mouse::ToggleButton(false, Robot::MouseButton::LEFT_BUTTON);
-            Robot::delay(500); // Give time for the drag to complete
-        }
+        // Release the mouse button
+        testState = TestState::RELEASING_MOUSE;
+        testNeedsRendering = true;
+        Robot::Mouse::ToggleButton(false, Robot::MouseButton::LEFT_BUTTON);
+        Robot::delay(500); // Give time for the drag to complete
 
         // Validate results
         testState = TestState::VALIDATING;
@@ -393,7 +320,6 @@ private:
     std::atomic<TestState> testState;
     std::atomic<bool> testNeedsRendering;
     std::mutex testMutex;
-    bool ciMode; // Flag for CI environment
 };
 
 } // namespace RobotTest

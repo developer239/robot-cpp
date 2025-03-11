@@ -19,19 +19,7 @@ using namespace RobotTest;
 class RobotTestApp {
 public:
     RobotTestApp(int argc, char** argv, int width = 800, int height = 600, bool headless = false)
-        : width(width), height(height), running(false), headless(headless),
-          ciMode(false) {
-
-        // Check for CI mode in args
-        for (int i = 0; i < argc; i++) {
-            if (std::string(argv[i]) == "--ci-mode") {
-                ciMode = true;
-                std::cout << "CI mode detected - using simulated input" << std::endl;
-                // On CI, we'll also make it headless
-                headless = true;
-                break;
-            }
-        }
+        : width(width), height(height), running(false), headless(headless) {
 
         // Initialize SDL
         if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -74,8 +62,8 @@ public:
             exit(1);
         }
 
-        // Initialize only mouse test module - pass the CI mode flag
-        mouseTests = std::make_unique<MouseTests>(renderer, window, ciMode);
+        // Initialize mouse test module
+        mouseTests = std::make_unique<MouseTests>(renderer, window);
 
         // In non-headless mode, make sure the window is visible and on top
         if (!headless) {
@@ -233,7 +221,6 @@ private:
     int width, height;
     bool running;
     bool headless;
-    bool ciMode;
     SDL_Window* window;
     SDL_Renderer* renderer;
 
@@ -253,9 +240,6 @@ int main(int argc, char* argv[]) {
         }
         else if (arg == "--headless") {
             headless = true;
-        }
-        else if (arg == "--ci-mode") {
-            // Handled separately in app constructor
         }
         else if (arg == "--wait-time" && i + 1 < argc) {
             waitTime = std::stoi(argv[i + 1]);
