@@ -11,7 +11,6 @@ set(SDL_TEST_SOURCES
         sdl/SDLTestMain.cpp
         sdl/MouseTests.cpp
         sdl/TestElements.h
-        sdl/ExtendedTestElements.h
         sdl/TestContext.h
         sdl/TestConfig.h
         sdl/RobotSDLTestFixture.h
@@ -35,13 +34,10 @@ set_target_properties(${SDL_TEST_NAME} PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin"
 )
 
-# Copy test assets
-file(COPY assets DESTINATION ${CMAKE_BINARY_DIR}/bin)
-
 # Add a custom command to build the SDL test executable
 add_custom_target(build_sdl_tests ALL DEPENDS ${SDL_TEST_NAME})
 
-# Add automated tests (exclude interactive tests)
+# Add automated tests
 add_test(
         NAME SDLFunctionalTests
         COMMAND ${SDL_TEST_NAME} --run-tests

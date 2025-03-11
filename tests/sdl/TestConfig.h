@@ -4,9 +4,6 @@
 #include <string>
 
 namespace RobotTest {
-    /**
-     * @brief Configuration for tests with default values
-     */
     struct TestConfig {
         // Window settings
         int windowWidth = 800;
@@ -32,7 +29,6 @@ namespace RobotTest {
         int dragOffsetY = 50;
         int positionTolerance = 20; // Pixels
 
-        // Parse command line arguments
         static TestConfig fromCommandLine(int argc, char **argv) {
             TestConfig config;
 
