@@ -3,6 +3,8 @@
 #include <SDL.h>
 #include <memory>
 #include <stdexcept>
+#include <functional>
+#include <vector>
 #include "TestConfig.h"
 
 namespace RobotTest {

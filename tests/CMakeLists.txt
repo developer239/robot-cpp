@@ -8,11 +8,12 @@ endif()
 
 # Define test sources
 set(SDL_TEST_SOURCES
-        sdl/SDLTestApp.cpp
+        sdl/SDLTestMain.cpp
+        sdl/MouseTests.cpp
         sdl/TestElements.h
-        sdl/MouseTests.h
         sdl/TestContext.h
         sdl/TestConfig.h
+        sdl/RobotSDLTestFixture.h
 )
 
 # Create test executable
@@ -39,17 +40,17 @@ file(COPY assets DESTINATION ${CMAKE_BINARY_DIR}/bin)
 # Add a custom command to build the SDL test executable
 add_custom_target(build_sdl_tests ALL DEPENDS ${SDL_TEST_NAME})
 
-# Add tests
+# Add automated tests (exclude interactive tests)
 add_test(
         NAME SDLFunctionalTests
-        COMMAND ${SDL_TEST_NAME} --run-tests
+        COMMAND ${SDL_TEST_NAME} --gtest_filter=-*InteractiveMode
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
 # Add interactive test configuration
 add_test(
         NAME SDLInteractiveTests
-        COMMAND ${SDL_TEST_NAME}
+        COMMAND ${SDL_TEST_NAME} --interactive
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 set_tests_properties(SDLInteractiveTests PROPERTIES DISABLED TRUE)
