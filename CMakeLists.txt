@@ -1,76 +1,209 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.24)
 
-project(RobotCPP)
+project(robot-cpp
+    VERSION 0.2.0
+    DESCRIPTION "Cross-platform keyboard, mouse, and screen automation"
+    LANGUAGES CXX
+)
 
+# Honour CMAKE_CXX_STANDARD on targets and keep this a subproject-friendly build.
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Library name
-set(LIB_NAME RobotCPP)
-
-# Option to build tests (OFF by default)
-option(BUILD_ROBOT_TESTS "Build the RobotCPP tests" OFF)
-
-# Only find dependencies and add GoogleTest if tests are enabled
-if(BUILD_ROBOT_TESTS)
-    # Add GoogleTest
-    add_subdirectory(externals/googletest)
-    enable_testing()
-
-    # Find SDL2 for tests
-    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/sdl2/")
-    find_package(SDL2 REQUIRED)
+if(NOT CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 endif()
 
-# Compiler-specific options
-if(MSVC)
-    # MSVC flags
-    add_compile_options(/W4 /MP)
+# Detect whether we are the top-level project so options don't leak into parents.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(ROBOT_IS_TOPLEVEL ON)
 else()
-    # GCC/Clang flags
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    set(ROBOT_IS_TOPLEVEL OFF)
 endif()
 
-# Common source files
-set(COMMON_SOURCES
-        src/ActionRecorder.h
-        src/types.h
-        src/Mouse.h
-        src/Mouse.cpp
-        src/Utils.h
-        src/Utils.cpp
-        src/Keyboard.cpp
-        src/Keyboard.h
-        src/Screen.cpp
-        src/Screen.h)
+option(ROBOT_BUILD_TESTS "Build robot-cpp tests" ${ROBOT_IS_TOPLEVEL})
+option(ROBOT_BUILD_INTERACTIVE_TESTS
+    "Build the SDL-driven interactive injection tests (needs a live display)" OFF)
+option(ROBOT_BUILD_EXAMPLES "Build robot-cpp examples" ${ROBOT_IS_TOPLEVEL})
+option(ROBOT_WERROR "Treat warnings as errors" OFF)
+option(ROBOT_LINUX_ENABLE_UINPUT "Build the Linux uinput backend" ON)
 
-# External dependencies
-set(SOURCES_LODEPNG
-        externals/lodepng/lodepng.cpp
-        externals/lodepng/lodepng.h)
+# ── Warnings interface ────────────────────────────────────────────────────────
+# A dedicated interface target carries warning flags so they attach per-target
+# instead of polluting the whole directory via add_compile_options.
+add_library(robot_warnings INTERFACE)
+if(MSVC)
+    target_compile_options(robot_warnings INTERFACE /W4 /permissive- /MP)
+    if(ROBOT_WERROR)
+        target_compile_options(robot_warnings INTERFACE /WX)
+    endif()
+else()
+    target_compile_options(robot_warnings INTERFACE
+        -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+    if(ROBOT_WERROR)
+        target_compile_options(robot_warnings INTERFACE -Werror)
+    endif()
+endif()
 
-# Platform-specific components
+# ── Vendored PNG encoder (private) ────────────────────────────────────────────
+add_library(robot_lodepng STATIC externals/lodepng/lodepng.cpp)
+target_include_directories(robot_lodepng
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/externals/lodepng>
+        $<INSTALL_INTERFACE:include/robot/external/lodepng>
+)
+set_target_properties(robot_lodepng PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# ── Portable sources (compiled on every platform) ─────────────────────────────
+set(ROBOT_COMMON_SOURCES
+    src/common/Session.cpp
+    src/common/Keyboard.cpp
+    src/common/Mouse.cpp
+    src/common/Screen.cpp
+    src/common/Image.cpp
+    src/common/Recorder.cpp
+    src/common/EventTap.cpp
+)
+
+# ── Platform selection: exactly one directory is compiled ─────────────────────
+# This is the single compile boundary. No consumer translation unit contains a
+# platform #ifdef; the platform is chosen here, once.
 if(APPLE)
-    list(APPEND PLATFORM_SOURCES src/EventHookMacOS.h)
-    find_library(CARBON_LIBRARY Carbon)
-    mark_as_advanced(CARBON_LIBRARY)
-    list(APPEND PLATFORM_LIBRARIES ${CARBON_LIBRARY})
+    set(ROBOT_PLATFORM_SOURCES
+        src/platform/macos/MacBackendFactory.cpp
+        src/platform/macos/MacKeyMap.cpp
+        src/platform/macos/MacKeyboardBackend.cpp
+        src/platform/macos/MacMouseBackend.cpp
+        src/platform/macos/MacScreenBackend.cpp
+        src/platform/macos/MacEventTapBackend.cpp
+    )
 elseif(WIN32)
-    list(APPEND PLATFORM_SOURCES src/EventHookWindows.h)
+    set(ROBOT_PLATFORM_SOURCES
+        src/platform/windows/WinBackendFactory.cpp
+        src/platform/windows/WinDpi.cpp
+        src/platform/windows/WinKeyMap.cpp
+        src/platform/windows/WinKeyboardBackend.cpp
+        src/platform/windows/WinMouseBackend.cpp
+        src/platform/windows/WinScreenBackend.cpp
+        src/platform/windows/WinEventTapBackend.cpp
+    )
+elseif(UNIX)
+    set(ROBOT_PLATFORM_SOURCES
+        src/platform/linux/LinuxBackendFactory.cpp
+        src/platform/linux/LinuxPlatformBackend.cpp
+        src/platform/linux/X11Display.cpp
+        src/platform/linux/X11KeyMap.cpp
+        src/platform/linux/X11KeyboardBackend.cpp
+        src/platform/linux/X11MouseBackend.cpp
+        src/platform/linux/X11ScreenBackend.cpp
+        src/platform/linux/X11EventTapBackend.cpp
+    )
+    if(ROBOT_LINUX_ENABLE_UINPUT)
+        list(APPEND ROBOT_PLATFORM_SOURCES
+            src/platform/linux/UinputBackend.cpp
+            src/platform/linux/LinuxEvdevKeymap.cpp
+        )
+    endif()
+else()
+    message(FATAL_ERROR "robot-cpp: unsupported platform")
 endif()
 
-# Define the main library
-add_library(${LIB_NAME} STATIC ${COMMON_SOURCES} ${PLATFORM_SOURCES} ${SOURCES_LODEPNG})
-target_include_directories(${LIB_NAME} PUBLIC src PRIVATE externals/lodepng)
-target_link_libraries(${LIB_NAME} ${PLATFORM_LIBRARIES})
+# ── Main library ──────────────────────────────────────────────────────────────
+add_library(robot ${ROBOT_COMMON_SOURCES} ${ROBOT_PLATFORM_SOURCES})
+add_library(robot::robot ALIAS robot)
 
-# Set output directory for all targets
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin)
+target_compile_features(robot PUBLIC cxx_std_23)
 
-# Add the tests directory only if tests are enabled
-if(BUILD_ROBOT_TESTS)
+# Public headers under include/; implementation-only headers under src/ are
+# private. The generator expression keeps install and build-tree includes correct.
+target_include_directories(robot
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# lodepng and the warnings flags are implementation details: PRIVATE, so they do
+# not propagate to consumers of the library.
+target_link_libraries(robot
+    PRIVATE
+        robot_lodepng
+        robot_warnings
+)
+
+set_target_properties(robot PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# ── Platform dependencies, scoped per target ──────────────────────────────────
+if(APPLE)
+    find_library(APPLICATION_SERVICES ApplicationServices REQUIRED)
+    # ApplicationServices types appear only in .cpp files (behind the backend
+    # interfaces), so the dependency is PRIVATE. Carbon is intentionally NOT used.
+    target_link_libraries(robot PRIVATE ${APPLICATION_SERVICES})
+elseif(WIN32)
+    # user32/gdi32 for SendInput, hooks, GDI capture. Shcore and the DPI context
+    # API are resolved at runtime (see WinDpi.cpp / WinScreenBackend.cpp), so they
+    # are not linked here.
+    target_link_libraries(robot PRIVATE user32 gdi32)
+    target_compile_definitions(robot PRIVATE
+        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+elseif(UNIX)
+    find_package(X11 REQUIRED)
+    # X11 headers are used only in platform .cpp files -> PRIVATE. XTest and
+    # Xrandr components ship with X11; XRecord lives in libXtst as well.
+    target_link_libraries(robot PRIVATE
+        X11::X11 X11::Xtst X11::Xrandr)
+endif()
+
+# ── Tests ─────────────────────────────────────────────────────────────────────
+if(ROBOT_BUILD_TESTS)
+    enable_testing()
     add_subdirectory(tests)
 endif()
+
+# ── Examples ──────────────────────────────────────────────────────────────────
+if(ROBOT_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
+
+# ── Install / export ──────────────────────────────────────────────────────────
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+install(TARGETS robot robot_lodepng robot_warnings
+    EXPORT robotTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+install(DIRECTORY include/robot DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES
+    externals/lodepng/lodepng.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/robot/external/lodepng
+)
+
+install(EXPORT robotTargets
+    FILE robotTargets.cmake
+    NAMESPACE robot::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/robot
+)
+
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/robotConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+# A minimal package config that re-finds the platform deps on the consumer side.
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/robotConfig.cmake"
+"include(CMakeFindDependencyMacro)\n\
+if(UNIX AND NOT APPLE)\n\
+  find_dependency(X11)\n\
+endif()\n\
+include(\"\${CMAKE_CURRENT_LIST_DIR}/robotTargets.cmake\")\n")
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/robotConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/robotConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/robot
+)
