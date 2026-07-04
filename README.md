@@ -1,312 +1,347 @@
-# Robot CPP
+# robot-cpp
 
 ![Build](https://github.com/developer239/robot-cpp/actions/workflows/build.yml/badge.svg)
-[![MacOS Tests](https://github.com/developer239/robot-cpp/actions/workflows/test-macos.yml/badge.svg)](https://github.com/developer239/robot-cpp/actions/workflows/test-macos.yml)
+[![macOS Tests](https://github.com/developer239/robot-cpp/actions/workflows/test-macos.yml/badge.svg)](https://github.com/developer239/robot-cpp/actions/workflows/test-macos.yml)
 [![Windows Tests](https://github.com/developer239/robot-cpp/actions/workflows/test-windows.yml/badge.svg)](https://github.com/developer239/robot-cpp/actions/workflows/test-windows.yml)
 
-This library is inspired by older unmaintained libraries like [octalmage/robotjs](https://github.com/octalmage/robotjs)
-and [Robot/robot-js](https://github.com/Robot/robot-js). The goal is to provide cross-platform controls for various
-devices such as keyboard, mouse, and screen for C++ applications.
+robot-cpp is a C++23 library for programmatic keyboard, mouse, and screen control on macOS, Windows, and Linux. It injects synthetic input, captures the screen at native resolution, and records and replays global input events, all behind a single `Session` object that owns the platform backend and reports what it can and cannot do in the current environment.
 
-**Supported system:**
+## Why it exists
 
-- MacOS
-- Windows
+Input-automation libraries in the [robotjs](https://github.com/octalmage/robotjs) lineage share a set of correctness gaps. They map characters through a hard-coded US-keyboard table, so capitals and symbols type wrong on other layouts, or cannot be typed at all. They treat the primary display as the whole screen, so multi-monitor and HiDPI setups break. They conflate logical desktop coordinates with device pixels, so capture buffers and cursor positions disagree on Retina and DPI-scaled displays. And they fail silently when the operating system withholds a capability or a permission.
 
-In case of Linux, please, create issue and leave a star and I will implement support. Right now I want to focus on port to
-Node.js using Node-API.
+robot-cpp is built around the distinctions those libraries collapse:
 
-## What can you do with it?
+- **Physical keys are separate from text.** A key is identified by its position; typing text injects Unicode directly and is layout-independent by construction.
+- **Logical coordinates are separate from device pixels.** Each display carries its own DPI scale factor and both coordinate spaces.
+- **Capabilities are reported and limits are hard errors.** Every fallible call returns a typed result; nothing degrades into a silent no-op.
+- **There is no global state.** Everything hangs off an explicit `Session`, so lifetimes are clear and the whole stack is testable.
 
-- Move mouse and simulate clicks
-- Simulate keyboard presses and releases as well as easily program more advanced interactions (for example `TypeHumanLike`)
-- Capture selected part of the screen and save it as PNG
-- **Record and replay mouse and keyboard events**
+## What it does
 
-There are some limitations but I would be more than happy to fix them and implement additional features. Feel free to create issue I will make the PR. 👀
+- Move the cursor (absolute or smoothly interpolated), click, double-click, drag, and scroll, with buttons through X1/X2 and line- or pixel-unit scrolling.
+- Press and release physical keys by position, build modifier chords, and type arbitrary Unicode text independent of the active keyboard layout.
+- Enumerate every display with its own scale factor and both logical and physical bounds, capture any region or a whole monitor at native pixel resolution, sample individual pixels, and encode captures as PNG.
+- Record global mouse and keyboard input and replay it with its original timing.
+- Report per-environment capabilities and return typed errors instead of failing silently.
+
+## Supported platforms
+
+| Platform          | Backend                       | Injection                       | Capture | Recording |
+| ----------------- | ----------------------------- | ------------------------------- | ------- | --------- |
+| macOS             | Quartz (CoreGraphics)         | yes (needs Accessibility)       | yes (needs Screen Recording) | yes (needs Accessibility) |
+| Windows           | SendInput + GDI               | yes                             | yes     | yes       |
+| Linux (X11)       | XTest + XRandR + XRecord      | yes                             | yes     | yes       |
+| Linux (Wayland)   | uinput (opt-in)               | keyboard + relative mouse only  | no      | no        |
+
+Wayland does not expose a protocol for an unprivileged client to inject input, warp the cursor, or capture the screen. Under a native Wayland session robot-cpp either runs through Xwayland (the X11 backend) or through the kernel-level uinput backend, with the limits above reported explicitly. See [Platform limitations](#platform-limitations) for the details.
+
+## Requirements
+
+- A C++23 toolchain: Apple Clang 17+ (Xcode 16+), Clang 18+, or GCC 14+.
+- CMake 3.24 or newer.
+- **macOS:** no extra packages; the library links `ApplicationServices` (Carbon is not used).
+- **Windows:** the Windows SDK (`user32`, `gdi32`).
+- **Linux:** X11 development packages - on Debian/Ubuntu, `libx11-dev`, `libxtst-dev`, `libxrandr-dev`. The optional uinput backend additionally needs kernel `uinput` support and write access to `/dev/uinput`.
+
+lodepng is vendored as a git submodule, so fetch submodules recursively (below). GoogleTest is downloaded automatically when tests are enabled, and SDL2 is only needed for the opt-in interactive tests.
 
 ## Installation
 
-Add this library as submodule:
+Add the library as a submodule and pull its dependencies:
 
-```git
-$ git submodule add https://github.com/developer239/robot-cpp externals/robot-cpp 
+```bash
+git submodule add https://github.com/developer239/robot-cpp externals/robot-cpp
+git submodule update --init --recursive
 ```
 
-Load modules dependencies:
-```git
-$ git submodule update --init --recursive
-```
+Link it from your CMake project:
 
-Update your CMake:
-
-```CMake
+```cmake
 add_subdirectory(externals/robot-cpp)
-target_link_libraries(<your_target> PRIVATE RobotCPP)
+target_link_libraries(your_target PRIVATE robot::robot)
 ```
 
-## Types
-
-### Point
-
-`Point` is a structure that represents a 2D point with integer coordinates (x, y). It also provides a method to
-calculate the distance between two points.
-
-#### Attributes
-
-- `int x;`
-  The x-coordinate of the point.
-
-- `int y;`
-  The y-coordinate of the point.
-
-#### Methods
-
-- `double Distance(Point target) const;`
-  Calculates and returns the Euclidean distance between the current point and the specified `target` point.
-
-### Example Usage
+Then include the umbrella header, or pull in individual headers to keep dependencies tight:
 
 ```cpp
-#include "robot.h"
-
-int main() {
-  Robot::Point p1{100, 200};
-  Robot::Point p2{300, 400};
-  double distance = p1.Distance(p2);
-  std::cout << "Distance between p1 and p2: " << distance << std::endl;
-}
+#include "robot/Robot.h"
 ```
 
-## Mouse Class
+Alternatively, install the library and consume it as a package:
 
-The `Mouse` class provides a static interface for controlling the mouse cursor, simulating mouse clicks, and scrolling.
-
-### Public Methods
-
-- `static void Move(Robot::Point point);`
-  Moves the mouse cursor to the specified point (x, y).
-
-- `static void MoveSmooth(Robot::Point point, double speed = 1500);`
-  Moves the mouse cursor smoothly to the specified point (x, y) at the given speed.
-
-- `static void Drag(Robot::Point point, double speed = 1500);`
-  Drags the mouse cursor to the specified point (x, y) at the given speed.
-
-- `static Robot::Point GetPosition();`
-  Returns the current position of the mouse cursor as a `Robot::Point`.
-
-- `static void ToggleButton(bool down, MouseButton button, bool doubleClick = false);`
-  Presses or releases the specified mouse button depending on the `down` argument. If `doubleClick` is set to true, it
-  will perform a double click.
-
-- `static void Click(MouseButton button);`
-  Simulates a single click using the specified mouse button.
-
-- `static void DoubleClick(MouseButton button);`
-  Simulates a double click using the specified mouse button.
-
-- `static void ScrollBy(int y, int x = 0);`
-  Scrolls the mouse wheel by the specified x and y distances.
-
-### Example Usage
-
-```cpp
-#include "robot.h"
-
-int main() {
-  Robot::Mouse::MoveSmooth({100, 200});
-}
+```cmake
+find_package(robot REQUIRED)
+target_link_libraries(your_target PRIVATE robot::robot)
 ```
 
-## Keyboard Class
+## Core concepts
 
-The `Keyboard` class provides a static interface for simulating keyboard key presses, releases, and typing.
+### A session owns the backend
 
-### Public Methods
+All state lives on a `Session`; there is no global input state. `Session::create()` performs the fallible setup - selecting a backend, checking permissions, probing the display server - and returns `std::expected<std::unique_ptr<Session>, robot::Error>`. On success you get a fully formed session; on failure a specific error, never a half-initialized object.
 
-- `static void Type(const std::string& query);`
-  Types the given text as a string.
+The session hands out references to four subsystems, `keyboard()`, `mouse()`, `screen()`, and `eventTap()`, plus a `capabilities()` report. Those references borrow the session-owned backend, so the session must outlive them; it is non-copyable and non-movable to keep them stable.
 
-- `static void TypeHumanLike(const std::string& query);`
-  Types the given text as a string with a human-like typing speed.
+### Physical keys versus text
 
-- `static void Click(char asciiChar);`
-  Simulates a key press and release for the specified ASCII character.
+This is the most important distinction in the API, and confusing the two is the root of the "only works on US keyboards" problem.
 
-- `static void Click(SpecialKey specialKey);`
-  Simulates a key press and release for the specified special key.
+- A `robot::Key` names a **physical key by position**. Its value is the USB HID usage id, independent of layout. `Key::A` is the key in the US-QWERTY A position; on an AZERTY layout that same physical key produces `q`. Use physical keys for shortcuts, chords, and games - anything positional, like WASD movement or Ctrl+key.
+- **Text** (`typeText`, `typeChar`) injects Unicode directly and is layout-independent by construction. This is the only correct way to produce specific characters - capitals, symbols, accented letters, CJK, emoji - because it does not assume any key-to-character mapping. Do not try to spell characters out of key presses; that only works on the one layout you hard-coded for.
 
-- `static void Press(char asciiChar);`
-  Simulates a key press for the specified ASCII character.
+Modifier semantics differ per platform and the library does not remap them for you: `Modifier::Meta` is Command on macOS and the Super/Windows key on Windows and Linux, and `Modifier::Alt` is Option on macOS. So a cross-platform "select all" is `Meta+A` on macOS and `Control+A` on Windows and Linux.
 
-- `static void Press(SpecialKey specialKey);`
-  Simulates a key press for the specified special key.
+### Logical versus physical coordinates
 
-- `static void Release(char asciiChar);`
-  Simulates a key release for the specified ASCII character.
+- **Logical coordinates** (`LogicalPoint`, `LogicalSize`, `LogicalRect`) are DPI-independent desktop units - macOS points, Windows DIPs. Cursor movement and position operate here, so behaviour is the same across displays of different density.
+- **Physical coordinates** (`PhysicalPoint`, `PhysicalSize`, `PhysicalRect`) are device pixels. Screen capture and pixel access operate here.
 
-- `static void Release(SpecialKey specialKey);`
-  Simulates a key release for the specified special key.
+The two are distinct types, and conversion is always explicit and goes through a scale factor. Each `Monitor` carries its own `scaleFactor` (2.0 on a typical Retina panel, 1.5 at 150% on Windows), both coordinate spaces, and can sit at a negative origin when placed left of or above the primary. A 100x100 logical capture on a 2x display yields a 200x200 image, and that pixel count is the truth about what was captured.
 
-### Example Usage
+### Capabilities and explicit errors
+
+Query `capabilities()` once after creating a session and branch on the flags. A `false` flag means the corresponding call returns `robot::ErrorCode::Unsupported` or `PermissionDenied`, never a silent no-op. Every fallible operation returns `std::expected<T, robot::Error>`, where `Error` carries an `ErrorCode` for programmatic handling and a human-readable `message`. Pixel-precise scrolling on a backend that lacks it, warping the cursor under unprivileged Wayland, injecting an X1 button where the OS cannot express it - all return a specific error you can see and handle.
+
+## Quick start
 
 ```cpp
-#include "robot.h"
+#include <print>
+#include "robot/Robot.h"
 
 int main() {
-  // Note that this will type the text in lower case and likely without special characters like !@#$%^&*()
-  Robot::Keyboard::TypeHumanLike("Hello, World");
-}
-```
+  auto session = robot::Session::create();
+  if (!session) {
+    std::println("robot-cpp unavailable: {}", session.error().message);
+    return 1;
+  }
 
-## Screen Class
+  robot::Keyboard& keyboard = (*session)->keyboard();
+  robot::Mouse& mouse = (*session)->mouse();
 
-The `Screen` class provides functionality to capture the screen, get pixel colors, and save the captured screen as a PNG image.
-
-### Public Methods
-
-- `Pixel GetPixelColor(int x, int y);`
-  Returns the color of the pixel at the specified (x, y) coordinates as a `Pixel` structure.
-
-- `DisplaySize GetScreenSize();`
-  Returns the size of the screen as a `DisplaySize` structure containing the width and height.
-
-- `void Capture(int x = 0, int y = 0, int width = -1, int height = -1);`
-  Captures a rectangular area of the screen defined by the specified (x, y) coordinates and dimensions (width, height).
-
-- `std::vector<Pixel> GetPixels() const;`
-  Returns a vector of `Pixel` structures representing the captured screen.
-
-- `void SaveAsPNG(const std::string &filename);`
-  Saves the captured screen as a PNG image with the specified filename.
-
-### Structures
-
-#### DisplaySize
-
-`DisplaySize` is a structure that represents the size of a display with integer dimensions (width, height).
-
-##### Attributes
-
-- `int width;`
-  The width of the display.
-
-- `int height;`
-  The height of the display.
-
-#### Pixel
-
-`Pixel` is a structure that represents the color of a pixel with unsigned char values for red, green, and blue channels.
-
-##### Attributes
-
-- `unsigned char r;`
-  The red channel value of the pixel.
-
-- `unsigned char g;`
-  The green channel value of the pixel.
-
-- `unsigned char b;`
-  The blue channel value of the pixel.
-
-### Example Usage
-
-```cpp
-#include "robot.h"
-
-int main() {
-  Robot::Screen screen;
-  screen.Capture(0, 0, 800, 600);
-  Robot::Pixel pixel = screen.GetPixelColor(100, 200);
-  screen.SaveAsPNG("screenshot.png");
-}
-```
-
-## Record and Replay Keyboard and Mouse Actions
-
-**Note:** It seems that recorded mouse position is slightly shifted on Windows.
-
-The `ActionRecorder` and `EventHook` classes provide functionality for recording user actions (such as mouse clicks and keyboard key presses) and replaying them later.
-
-### ActionRecorder Class
-
-The `ActionRecorder` class is responsible for recording user actions and storing them as a sequence of actions. It provides methods to record mouse clicks, keyboard key presses, and mouse movements.
-
-#### Public Methods
-
-- `void RecordPressLeft(float x, float y);`
-  Records a left mouse button press action at the specified coordinates (x, y).
-
-- `void RecordReleaseLeft(float x, float y);`
-  Records a left mouse button release action at the specified coordinates (x, y).
-
-- `void RecordKeyPress(uint16_t key);`
-  Records a keyboard key press action for the specified virtual key code.
-
-- `void RecordKeyRelease(uint16_t key);`
-  Records a keyboard key release action for the specified virtual key code.
-
-- `void RecordMouseMove(float x, float y);`
-  Records a mouse movement action to the specified coordinates (x, y).
-
-- `void ReplayActions();`
-  Replays the recorded actions in the same sequence they were recorded.
-
-### EventHook Class
-
-The `EventHook` class is responsible for hooking into system events and capturing user actions in real-time. It uses the Core Graphics Event Tap API to intercept mouse and keyboard events. The captured events are then forwarded to the `ActionRecorder` for recording.
-
-#### Public Methods
-
-- `explicit EventHook(ActionRecorder& recorder);`
-  Constructs an `EventHook` object with a reference to the `ActionRecorder` instance.
-
-- `void StartRecording();`
-  Starts the event hook and begins recording user actions.
-
-- `void StopRecording();`
-  Stops the event hook and stops recording user actions.
-
-Please note that the `EventHook` class currently supports macOS, and Windows support is not yet implemented.
-
-### Example Usage
-
-Here's an example code snippet demonstrating how to use the `ActionRecorder` and `EventHook` classes to record and replay user actions:
-
-```cpp
-#include <EventHook.h>
-#include <Utils.h>
-#include <iostream>
-
-int main() {
-  int recordFor = 10;
-
-  Robot::ActionRecorder recorder;
-  Robot::EventHook hook(recorder);
-
-  std::cout << "Start recording actions in 3 seconds..." << std::endl;
-  std::this_thread::sleep_for(std::chrono::seconds(3));
-
-  // Start recording
-  std::cout << "Starting to record actions for " << recordFor << " seconds..." << std::endl;
-  std::thread recordingThread([&hook] { hook.StartRecording(); });
-
-  // Sleep for 10 seconds
-  std::this_thread::sleep_for(std::chrono::seconds(recordFor));
-
-  // Stop recording
-  std::cout << "Stopping recording..." << std::endl;
-  hook.StopRecording();
-  recordingThread.join();
-
-  // Wait for 5 seconds before replaying
-  std::cout << "Replaying actions in 3 seconds..." << std::endl;
-  std::this_thread::sleep_for(std::chrono::seconds(3));
-
-  // Replay the recorded actions
-  std::cout << "Replaying actions..." << std::endl;
-  recorder.ReplayActions();
-
+  if (auto r = mouse.moveSmooth({400.0, 300.0}); !r) {
+    std::println("move failed: {}", r.error().message);
+  }
+  if (auto r = keyboard.typeText("Hello, 世界! 🙂"); !r) {
+    std::println("type failed: {}", r.error().message);
+  }
   return 0;
 }
+```
+
+Every action returns `std::expected<T, robot::Error>`. The snippets below omit the `if (auto r = ...; !r)` checks shown above for brevity; handle the results the same way in real code.
+
+## Keyboard
+
+```cpp
+// Layout-independent Unicode text (any script, symbols, emoji):
+keyboard.typeText("café ☕ 日本語 🙂");
+
+// Human-paced typing (randomized inter-key delay; a fixed seed makes it reproducible):
+keyboard.typeTextHumanLike("dear reviewer,");
+
+// A single physical key, by position:
+keyboard.tap(robot::Key::Enter);
+
+// Modifier chords: the modifier is held around the key and released in reverse order.
+keyboard.tap(robot::Key::C, robot::Modifiers{robot::Modifier::Control});
+keyboard.tap(robot::Key::S, robot::Modifier::Control | robot::Modifier::Shift);
+
+// Hold a key down and release it later (for example, movement in a game):
+keyboard.press(robot::Key::W);
+// ... later ...
+keyboard.release(robot::Key::W);
+```
+
+## Mouse
+
+Mouse control operates in global logical coordinates (the virtual desktop shared by all monitors).
+
+```cpp
+mouse.move({800.0, 450.0});          // absolute warp in logical coordinates
+mouse.moveSmooth({100.0, 100.0});    // interpolated over a duration
+
+mouse.click();                       // left click at the current position
+mouse.click(robot::MouseButton::Right);
+mouse.doubleClick();                 // reported to the OS as a real double-click
+mouse.click(robot::MouseButton::X1); // needs capabilities().supportsExtraMouseButtons
+
+mouse.drag({500.0, 500.0});          // press, move (delivered as a drag), release
+mouse.dragSmooth({500.0, 500.0});
+
+mouse.scroll(robot::ScrollDelta::lines(3));     // three notches up
+mouse.scroll(robot::ScrollDelta::pixels(-120)); // needs supportsHighResolutionScroll
+
+auto pos = mouse.position();         // std::expected<robot::LogicalPoint, Error>
+```
+
+Scroll sign convention, applied before any operating-system "natural scrolling" setting: `vertical > 0` scrolls up, `horizontal > 0` scrolls right. Natural scrolling may invert the visible direction; that is a user preference the library does not hide.
+
+## Screen
+
+Capture regions are specified in device pixels, because that is the only unambiguous unit across mixed-density displays. Use a monitor's `physicalBounds`, or `captureMonitor`, to avoid doing the scale math by hand.
+
+```cpp
+robot::Screen& screen = (*session)->screen();
+
+// Every display, primary first, each with its own scale factor and both coordinate spaces:
+if (auto monitors = screen.monitors()) {
+  for (const robot::Monitor& m : *monitors) {
+    std::println("{}: {}x{} physical, scale {:.2f}{}", m.name,
+                 m.physicalBounds.size.width, m.physicalBounds.size.height,
+                 m.scaleFactor, m.isPrimary ? " (primary)" : "");
+  }
+}
+
+// Capture the primary display at native pixel resolution and save a PNG:
+if (auto primary = screen.primaryMonitor()) {
+  if (auto image = screen.captureMonitor(primary->id)) {
+    image->savePng("primary.png");
+  }
+}
+
+// Capture an explicit device-pixel region (origin, size):
+auto region = screen.capture(robot::PhysicalRect{{0, 0}, {1920, 1080}});
+
+// Sample one pixel at a device-pixel coordinate:
+if (auto color = screen.pixel({100, 200})) {
+  std::println("rgba({}, {}, {}, {})", color->r, color->g, color->b, color->a);
+}
+```
+
+## Recording and replay
+
+A global event tap observes all mouse and keyboard activity and forwards it as normalized events, which a `Recorder` stamps with elapsed time. Recording is a privileged, platform-limited capability, so check `canRecordEvents` first. Key events are captured as physical keys, so a recording replays by position and is layout-independent.
+
+```cpp
+#include <chrono>
+#include <thread>
+
+if (!(*session)->capabilities().canRecordEvents) {
+  std::println("Global recording is not available on this backend.");
+  return 1;
+}
+
+robot::Recorder recorder;
+robot::EventTap& tap = (*session)->eventTap();
+
+// start() blocks on the OS event loop until stop(), so run it on its own thread.
+std::thread recording([&] {
+  if (auto r = tap.start([&](const robot::InputEvent& e) { recorder.capture(e); });
+      !r) {
+    std::println("tap error: {}", r.error().message);
+  }
+});
+
+std::this_thread::sleep_for(std::chrono::seconds(5));
+tap.stop();
+recording.join();
+
+std::println("captured {} events", recorder.events().size());
+
+// Replay honours the recorded gaps; timeScale and maxGap are available via ReplayOptions.
+if (auto r = recorder.replay(**session); !r) {
+  std::println("replay failed: {}", r.error().message);
+}
+```
+
+## Source layout
+
+```
+include/robot/            Public API - pure value types and facades, no OS headers.
+  Error.h                 Error and ErrorCode.
+  Geometry.h              Logical vs physical points, sizes, and rects.
+  Key.h                   Physical keys (USB HID usage ids).
+  Modifiers.h             Modifier and the Modifiers bitmask.
+  MouseButton.h Scroll.h  Buttons (including X1/X2), scroll units and deltas.
+  Monitor.h Capabilities.h Image.h
+  Event.h                 Normalized input events used for recording.
+  Keyboard.h Mouse.h Screen.h Recorder.h EventTap.h Session.h
+  Robot.h                 Umbrella include.
+  backend/                Abstract backend interfaces - the extension seam.
+src/
+  common/                 Portable implementation of every facade.
+  platform/macos/         Quartz backend.
+  platform/windows/       SendInput and GDI backend.
+  platform/linux/         X11/XTest backend and the optional uinput backend.
+tests/
+  unit/                   Runs in CI; a mock backend, no OS interaction.
+  interactive/            Opt-in SDL injection tests; needs a live display.
+examples/                 Runnable programs (type text, capture screen, record/replay).
+```
+
+The operating-system boundary lives entirely behind the backend interfaces. No public header includes an OS header, and CMake compiles exactly one `platform/` directory, so no consumer translation unit contains a platform `#ifdef`.
+
+## Building and running tests
+
+```bash
+cmake -S . -B build -DROBOT_BUILD_TESTS=ON
+cmake --build build -j
+ctest --test-dir build --output-on-failure
+```
+
+The unit tests exercise the entire portable stack - chord building, UTF-8 decoding, smooth-move sequencing, recorder timing, and the screen facade math - against a mock backend, so they do no real OS injection and run headless in normal CI.
+
+The interactive tests drive the real cursor and keyboard against an on-screen SDL window and cannot run on a headless runner, so they are opt-in and never part of the default test run:
+
+```bash
+cmake -S . -B build -DROBOT_BUILD_INTERACTIVE_TESTS=ON
+cmake --build build -j
+ctest --test-dir build -R InteractiveInjection --output-on-failure
+```
+
+CMake options:
+
+| Option                        | Default            | Effect                                              |
+| ----------------------------- | ------------------ | --------------------------------------------------- |
+| `ROBOT_BUILD_TESTS`           | on when top-level  | Build the portable unit tests.                      |
+| `ROBOT_BUILD_INTERACTIVE_TESTS` | off              | Build the SDL injection tests (needs a live display). |
+| `ROBOT_BUILD_EXAMPLES`        | on when top-level  | Build the example programs.                         |
+| `ROBOT_WERROR`                | off                | Treat warnings as errors.                           |
+| `ROBOT_LINUX_ENABLE_UINPUT`   | on                 | Build the Linux uinput backend.                     |
+
+## Platform limitations
+
+These are inherent to each platform and are reported through `capabilities()` and typed errors rather than hidden behind silent fallbacks.
+
+### macOS
+
+Injection and global recording require the Accessibility permission; screen capture requires the Screen Recording permission. Grant them in System Settings under Privacy & Security. Until they are granted, `capabilities()` reports the corresponding abilities as unavailable and the calls return `PermissionDenied`. To fail up front instead of at first use, construct the session with the permission preflight:
+
+```cpp
+robot::SessionOptions options;
+options.requireInputPermission = true;    // Accessibility
+options.requireCapturePermission = true;  // Screen Recording
+auto session = robot::Session::create(options);
+```
+
+Screen capture uses CoreGraphics APIs that are deprecated (still functional) on macOS 14+. Migrating to ScreenCaptureKit is planned and is isolated to the macOS screen backend.
+
+### Windows
+
+No runtime permission is required for injection or GDI capture from an interactive desktop session. User Interface Privilege Isolation can still block injection into a window running at higher integrity than the calling process; that surfaces as a failed injection rather than a capability flag. High-resolution (pixel-unit) scrolling is granular but not sub-notch, because true per-pixel wheel data is a Precision Touchpad driver feature and is not available to synthetic input.
+
+### Linux
+
+Under X11 the library has full injection, capture, and recording through XTest, XRandR, and XRecord. Two X11 limits are reported explicitly: core-protocol scrolling is discrete wheel steps, so pixel-unit scrolling returns an error, and X exposes no per-monitor logical scaling at the core level, so `scaleFactor` is reported as 1.0.
+
+Under a native Wayland session, an unprivileged client cannot inject input, warp or read the cursor, or capture the screen, because Wayland provides no protocol for it. `Session::create()` detects this and returns a specific error naming the two options:
+
+- Run under Xwayland (set `DISPLAY`); the X11 backend then drives X11 and Xwayland clients.
+- Construct the session with the kernel-level backend:
+
+```cpp
+robot::SessionOptions options;
+options.linuxBackend = robot::LinuxBackend::Uinput;
+auto session = robot::Session::create(options);
+```
+
+uinput works under Wayland but injects relative pointer motion only: there is no absolute cursor warp, no pointer-position read, no screen capture, no monitor enumeration, and no Unicode text (the kernel interface carries no layout). It requires write access to `/dev/uinput` (root, or a udev rule granting the input group). Every one of these limits is reflected in `capabilities()`.
+
+## Examples
+
+Runnable programs live in `examples/` and are built when `ROBOT_BUILD_EXAMPLES` is on. Each is a small, complete reference you can copy from:
+
+- `type_text.cpp` - the create-then-check-capabilities pattern, plus the physical-key versus Unicode-text split.
+- `capture_screen.cpp` - density-correct capture of the primary display, saved as PNG.
+- `record_replay.cpp` - recording global input for a few seconds and replaying it with its original timing.
