@@ -245,33 +245,6 @@ if (auto r = recorder.replay(**session); !r) {
 }
 ```
 
-## Source layout
-
-```
-include/robot/            Public API - pure value types and facades, no OS headers.
-  Error.h                 Error and ErrorCode.
-  Geometry.h              Logical vs physical points, sizes, and rects.
-  Key.h                   Physical keys (USB HID usage ids).
-  Modifiers.h             Modifier and the Modifiers bitmask.
-  MouseButton.h Scroll.h  Buttons (including X1/X2), scroll units and deltas.
-  Monitor.h Capabilities.h Image.h
-  Event.h                 Normalized input events used for recording.
-  Keyboard.h Mouse.h Screen.h Recorder.h EventTap.h Session.h
-  Robot.h                 Umbrella include.
-  backend/                Abstract backend interfaces - the extension seam.
-src/
-  common/                 Portable implementation of every facade.
-  platform/macos/         Quartz backend.
-  platform/windows/       SendInput and GDI backend.
-  platform/linux/         X11/XTest backend and the optional uinput backend.
-tests/
-  unit/                   Runs in CI; a mock backend, no OS interaction.
-  interactive/            Opt-in SDL injection tests; needs a live display.
-examples/                 Runnable programs (type text, capture screen, record/replay).
-```
-
-The operating-system boundary lives entirely behind the backend interfaces. No public header includes an OS header, and CMake compiles exactly one `platform/` directory, so no consumer translation unit contains a platform `#ifdef`.
-
 ## Building and running tests
 
 ```bash
