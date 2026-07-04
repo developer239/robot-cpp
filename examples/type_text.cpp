@@ -23,7 +23,10 @@ int main() {
 
   // Layout-independent Unicode text, including characters absent from a US
   // keyboard.
-  if (auto r = keyboard.typeText("Hello, \u4e16\u754c! \U0001F642\n"); !r) {
+  if (auto r = keyboard.typeText(
+          "Hello, \xE4\xB8\x96\xE7\x95\x8C! \xF0\x9F\x99\x82\n"
+      );
+      !r) {
     std::println("typeText failed: {}", r.error().message);
     return 1;
   }

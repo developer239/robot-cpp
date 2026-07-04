@@ -21,8 +21,11 @@ TEST(Utf8, DecodesAsciiAndMultibyte) {
   MockPlatformBackend backend;
   Keyboard keyboard(backend.keyboard());
 
-  // "Aé中🙂": 1-, 2-, 3-, and 4-byte sequences in one string.
-  const auto result = keyboard.typeText("A\u00e9\u4e2d\U0001F642");
+  // "Aé中🙂": 1-, 2-, 3-, and 4-byte UTF-8 sequences in one string.
+  // Keep the input byte-explicit so MSVC does not transcode the narrow literal
+  // through the active source code page.
+  const std::string input = "A\xC3\xA9\xE4\xB8\xAD\xF0\x9F\x99\x82";
+  const auto result = keyboard.typeText(input);
   ASSERT_TRUE(result.has_value());
 
   const auto codes = typed(backend.log());

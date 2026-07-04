@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <memory>
 
 #include "LinuxEvdevKeymap.h"  // Key -> evdev KEY_* codes (declared below).
 

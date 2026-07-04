@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "robot/backend/IKeyboardBackend.h"
 #include "robot/backend/IMouseBackend.h"
 
