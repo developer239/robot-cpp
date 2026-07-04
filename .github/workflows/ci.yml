@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'include/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'examples/**'
+      - 'cmake/**'
+      - 'externals/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'include/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'examples/**'
+      - 'cmake/**'
+      - 'externals/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux (GCC 14)
+            os: ubuntu-latest
+            examples: 'ON'
+            cmake_args: ''
+          - name: macOS (Apple Clang)
+            os: macos-15
+            # The examples use std::println, and Apple Clang's libc++ does not
+            # ship <print> yet. The library and unit tests use std::format and
+            # std::expected, which this toolchain has.
+            examples: 'OFF'
+            cmake_args: ''
+          - name: Windows (MSVC)
+            os: windows-latest
+            examples: 'ON'
+            cmake_args: '-A x64'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14 libx11-dev libxtst-dev libxrandr-dev
+          echo "CC=gcc-14" >> "$GITHUB_ENV"
+          echo "CXX=g++-14" >> "$GITHUB_ENV"
+
+      - name: Print CMake version
+        run: cmake --version
+
+      - name: Configure
+        run: >
+          cmake -S . -B build ${{ matrix.cmake_args }}
+          -DCMAKE_BUILD_TYPE=Release
+          -DROBOT_BUILD_TESTS=ON
+          -DROBOT_BUILD_EXAMPLES=${{ matrix.examples }}
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Unit tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  sanitizers:
+    name: Sanitizers (ASan + UBSan)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14 libx11-dev libxtst-dev libxrandr-dev
+
+      - name: Configure
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DROBOT_BUILD_TESTS=ON
+          -DROBOT_BUILD_EXAMPLES=OFF
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Unit tests
+        env:
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+          ASAN_OPTIONS: detect_leaks=1
+        run: ctest --test-dir build --output-on-failure

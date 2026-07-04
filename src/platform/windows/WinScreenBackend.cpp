@@ -4,7 +4,6 @@
 
 #include <cmath>
 #include <cstdint>
-#include <format>
 #include <string>
 
 namespace robot::win {
@@ -31,18 +30,6 @@ double monitorScale(HMONITOR monitor) {
   return static_cast<double>(dpiX) / 96.0;
 }
 
-std::wstring toWide(const std::string& s) {
-  if (s.empty()) return {};
-  const int len = MultiByteToWideChar(
-      CP_UTF8, 0, s.c_str(), static_cast<int>(s.size()), nullptr, 0
-  );
-  std::wstring w(len, L'\0');
-  MultiByteToWideChar(
-      CP_UTF8, 0, s.c_str(), static_cast<int>(s.size()), w.data(), len
-  );
-  return w;
-}
-
 }  // namespace
 
 BOOL CALLBACK WinScreenBackend::monitorEnumProc(
@@ -63,7 +50,6 @@ BOOL CALLBACK WinScreenBackend::monitorEnumProc(
 
   Monitor m;
   m.id = static_cast<std::uint32_t>(out->size() + 1);
-  m.name = std::format("{}", std::string(info.szDevice, info.szDevice + wcslen(info.szDevice) == info.szDevice ? 0 : 0));
   // szDevice is wide; format a stable ASCII-ish name without a full conversion.
   {
     std::string name;

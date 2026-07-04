@@ -16,7 +16,7 @@ using robot::Key;
 // that physical key. The backend resolves keysym -> current keycode via the
 // server, so this drives the physical position for those layouts; genuinely
 // layout-independent character output is the separate typeUnicode path.
-constexpr std::array<std::pair<Key, KeySym>, 104> kTable{{
+constexpr auto kTable = std::to_array<std::pair<Key, KeySym>>({
     {Key::A, XK_a}, {Key::B, XK_b}, {Key::C, XK_c}, {Key::D, XK_d},
     {Key::E, XK_e}, {Key::F, XK_f}, {Key::G, XK_g}, {Key::H, XK_h},
     {Key::I, XK_i}, {Key::J, XK_j}, {Key::K, XK_k}, {Key::L, XK_l},
@@ -59,7 +59,7 @@ constexpr std::array<std::pair<Key, KeySym>, 104> kTable{{
     {Key::LeftAlt, XK_Alt_L}, {Key::LeftMeta, XK_Super_L},
     {Key::RightControl, XK_Control_R}, {Key::RightShift, XK_Shift_R},
     {Key::RightAlt, XK_Alt_R}, {Key::RightMeta, XK_Super_R},
-}};
+});
 
 }  // namespace
 

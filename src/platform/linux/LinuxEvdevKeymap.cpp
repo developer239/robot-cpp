@@ -10,7 +10,7 @@ namespace {
 
 using robot::Key;
 
-constexpr std::array<std::pair<Key, std::uint16_t>, 100> kTable{{
+constexpr auto kTable = std::to_array<std::pair<Key, std::uint16_t>>({
     {Key::A, KEY_A}, {Key::B, KEY_B}, {Key::C, KEY_C}, {Key::D, KEY_D},
     {Key::E, KEY_E}, {Key::F, KEY_F}, {Key::G, KEY_G}, {Key::H, KEY_H},
     {Key::I, KEY_I}, {Key::J, KEY_J}, {Key::K, KEY_K}, {Key::L, KEY_L},
@@ -52,7 +52,7 @@ constexpr std::array<std::pair<Key, std::uint16_t>, 100> kTable{{
     {Key::LeftAlt, KEY_LEFTALT}, {Key::LeftMeta, KEY_LEFTMETA},
     {Key::RightControl, KEY_RIGHTCTRL}, {Key::RightShift, KEY_RIGHTSHIFT},
     {Key::RightAlt, KEY_RIGHTALT}, {Key::RightMeta, KEY_RIGHTMETA},
-}};
+});
 
 }  // namespace
 

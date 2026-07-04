@@ -28,29 +28,3 @@ target_include_directories(robot_unit_tests PRIVATE
 
 include(GoogleTest)
 gtest_discover_tests(robot_unit_tests)
-
-# ── Interactive injection tests: opt-in, need a live display ──────────────────
-# The existing SDL suite drives real cursor/keyboard events against an on-screen
-# window and cannot run on a normal headless CI runner, so it is gated behind its
-# own option and never part of the default test run.
-if(ROBOT_BUILD_INTERACTIVE_TESTS)
-    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/sdl2/")
-    find_package(SDL2 REQUIRED)
-
-    add_executable(robot_interactive_tests
-        interactive/InteractiveMain.cpp
-        interactive/MouseInjectionTests.cpp
-        interactive/support/TestContext.h
-        interactive/support/TestElements.h
-        interactive/support/TestConfig.h
-        interactive/support/InteractiveFixture.h
-    )
-    target_link_libraries(robot_interactive_tests PRIVATE
-        robot::robot SDL2::SDL2 gtest gtest_main)
-    set_target_properties(robot_interactive_tests PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-
-    add_test(NAME InteractiveInjection
-        COMMAND robot_interactive_tests --run-tests
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-endif()

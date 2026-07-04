@@ -49,8 +49,8 @@ std::expected<std::unique_ptr<UinputBackend>, Error> UinputBackend::create() {
   }
 
   // Advertise the event types this virtual device emits: keys, relative motion,
-  // and wheel. A real implementation enables every KEY_* it may send; the full
-  // enable loop is elided here for brevity but follows the same ioctl pattern.
+  // and wheel. Enable the whole key range because this backend maps the public
+  // key vocabulary to evdev codes at call time.
   ioctl(fd, UI_SET_EVBIT, EV_KEY);
   ioctl(fd, UI_SET_EVBIT, EV_REL);
   ioctl(fd, UI_SET_EVBIT, EV_SYN);
@@ -135,6 +135,12 @@ std::expected<void, Error> UinputBackend::button(
 }
 
 std::expected<void, Error> UinputBackend::scroll(const ScrollDelta delta) {
+  if (delta.unit == ScrollUnit::Pixel) {
+    return std::unexpected(Error::unsupported(
+        "pixel-precise scrolling is unavailable through uinput; use line units"
+    ));
+  }
+
   if (delta.vertical != 0.0) {
     if (auto r = emit(EV_REL, REL_WHEEL,
                       static_cast<std::int32_t>(std::lround(delta.vertical)));

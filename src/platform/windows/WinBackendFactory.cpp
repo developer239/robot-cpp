@@ -20,7 +20,7 @@ Capabilities buildCapabilities() {
   c.canWarpCursor = true;
   c.canReadCursorPosition = true;
   c.supportsExtraMouseButtons = true;
-  c.supportsHighResolutionScroll = true;  // Granular wheel via SendInput.
+  c.supportsHighResolutionScroll = false;
   c.canCaptureScreen = true;
   c.canEnumerateMonitors = true;
   c.canRecordEvents = true;

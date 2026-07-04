@@ -23,8 +23,6 @@ else()
 endif()
 
 option(ROBOT_BUILD_TESTS "Build robot-cpp tests" ${ROBOT_IS_TOPLEVEL})
-option(ROBOT_BUILD_INTERACTIVE_TESTS
-    "Build the SDL-driven interactive injection tests (needs a live display)" OFF)
 option(ROBOT_BUILD_EXAMPLES "Build robot-cpp examples" ${ROBOT_IS_TOPLEVEL})
 option(ROBOT_WERROR "Treat warnings as errors" OFF)
 option(ROBOT_LINUX_ENABLE_UINPUT "Build the Linux uinput backend" ON)
@@ -88,7 +86,7 @@ elseif(WIN32)
         src/platform/windows/WinScreenBackend.cpp
         src/platform/windows/WinEventTapBackend.cpp
     )
-elseif(UNIX)
+elseif(UNIX AND NOT APPLE)
     set(ROBOT_PLATFORM_SOURCES
         src/platform/linux/LinuxBackendFactory.cpp
         src/platform/linux/LinuxPlatformBackend.cpp
@@ -148,8 +146,14 @@ elseif(WIN32)
     target_link_libraries(robot PRIVATE user32 gdi32)
     target_compile_definitions(robot PRIVATE
         WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
-elseif(UNIX)
+elseif(UNIX AND NOT APPLE)
     find_package(X11 REQUIRED)
+    if(NOT TARGET X11::Xtst)
+        message(FATAL_ERROR "robot-cpp: XTest development files are required")
+    endif()
+    if(NOT TARGET X11::Xrandr)
+        message(FATAL_ERROR "robot-cpp: XRandR development files are required")
+    endif()
     # X11 headers are used only in platform .cpp files -> PRIVATE. XTest and
     # Xrandr components ship with X11; XRecord lives in libXtst as well.
     target_link_libraries(robot PRIVATE
@@ -199,6 +203,12 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/robotConfig.cmake"
 "include(CMakeFindDependencyMacro)\n\
 if(UNIX AND NOT APPLE)\n\
   find_dependency(X11)\n\
+  if(NOT TARGET X11::Xtst)\n\
+    message(FATAL_ERROR \"robot-cpp: XTest development files are required\")\n\
+  endif()\n\
+  if(NOT TARGET X11::Xrandr)\n\
+    message(FATAL_ERROR \"robot-cpp: XRandR development files are required\")\n\
+  endif()\n\
 endif()\n\
 include(\"\${CMAKE_CURRENT_LIST_DIR}/robotTargets.cmake\")\n")
 

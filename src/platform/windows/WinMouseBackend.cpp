@@ -1,6 +1,9 @@
 #include "WinMouseBackend.h"
 
+#include <shellscalingapi.h>
+
 #include <cmath>
+#include <vector>
 
 namespace robot::win {
 namespace {
@@ -13,6 +16,97 @@ std::expected<void, Error> send(const INPUT& input) {
     );
   }
   return {};
+}
+
+double monitorScale(HMONITOR monitor) {
+  using GetDpiFn = HRESULT(WINAPI*)(HMONITOR, MONITOR_DPI_TYPE, UINT*, UINT*);
+  static GetDpiFn getDpi = [] {
+    if (HMODULE shcore = LoadLibraryW(L"Shcore.dll"); shcore != nullptr) {
+      return reinterpret_cast<GetDpiFn>(
+          reinterpret_cast<void*>(GetProcAddress(shcore, "GetDpiForMonitor"))
+      );
+    }
+    return static_cast<GetDpiFn>(nullptr);
+  }();
+
+  if (getDpi == nullptr) return 1.0;
+  UINT dpiX = 96;
+  UINT dpiY = 96;
+  if (getDpi(monitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY) != S_OK) return 1.0;
+  return static_cast<double>(dpiX) / 96.0;
+}
+
+struct MonitorMapping {
+  RECT physical{};
+  LogicalRect logical;
+  double scale = 1.0;
+};
+
+BOOL CALLBACK collectMonitor(
+    HMONITOR monitor, HDC /*dc*/, LPRECT /*rect*/, LPARAM userData
+) {
+  auto* out = reinterpret_cast<std::vector<MonitorMapping>*>(userData);
+
+  MONITORINFO info{};
+  info.cbSize = sizeof(info);
+  if (GetMonitorInfoW(monitor, &info) == 0) return TRUE;
+
+  const RECT& r = info.rcMonitor;
+  const double scale = monitorScale(monitor);
+  out->push_back(MonitorMapping{
+      .physical = r,
+      .logical = LogicalRect{
+          {static_cast<double>(r.left) / scale,
+           static_cast<double>(r.top) / scale},
+          {static_cast<double>(r.right - r.left) / scale,
+           static_cast<double>(r.bottom - r.top) / scale}},
+      .scale = scale,
+  });
+  return TRUE;
+}
+
+std::expected<std::vector<MonitorMapping>, Error> monitorMappings() {
+  std::vector<MonitorMapping> monitors;
+  EnumDisplayMonitors(
+      nullptr, nullptr, &collectMonitor, reinterpret_cast<LPARAM>(&monitors)
+  );
+  if (monitors.empty()) {
+    return std::unexpected(Error::platformError("EnumDisplayMonitors found none"));
+  }
+  return monitors;
+}
+
+bool contains(const RECT& rect, const POINT point) {
+  return point.x >= rect.left && point.x < rect.right && point.y >= rect.top &&
+         point.y < rect.bottom;
+}
+
+std::expected<POINT, Error> toPhysicalPoint(const LogicalPoint point) {
+  auto monitors = monitorMappings();
+  if (!monitors) return std::unexpected(monitors.error());
+
+  for (const MonitorMapping& monitor : *monitors) {
+    if (!monitor.logical.contains(point)) continue;
+    return POINT{static_cast<LONG>(std::lround(point.x * monitor.scale)),
+                 static_cast<LONG>(std::lround(point.y * monitor.scale))};
+  }
+  return std::unexpected(Error::invalidArgument(
+      "logical cursor point is outside all enumerated monitors"
+  ));
+}
+
+std::expected<LogicalPoint, Error> toLogicalPoint(const POINT point) {
+  auto monitors = monitorMappings();
+  if (!monitors) return std::unexpected(monitors.error());
+
+  for (const MonitorMapping& monitor : *monitors) {
+    if (!contains(monitor.physical, point)) continue;
+    return LogicalPoint{static_cast<double>(point.x) / monitor.scale,
+                        static_cast<double>(point.y) / monitor.scale};
+  }
+  return std::unexpected(Error::platformError(
+      "physical cursor position is outside all enumerated monitors"
+  ));
 }
 
 }  // namespace
@@ -29,8 +123,11 @@ std::expected<void, Error> WinMouseBackend::warpCursor(const LogicalPoint point)
     return std::unexpected(Error::platformError("invalid virtual screen size"));
   }
 
-  const double nx = (point.x - vx) * 65535.0 / (vw - 1);
-  const double ny = (point.y - vy) * 65535.0 / (vh - 1);
+  auto physical = toPhysicalPoint(point);
+  if (!physical) return std::unexpected(physical.error());
+
+  const double nx = (physical->x - vx) * 65535.0 / (vw - 1);
+  const double ny = (physical->y - vy) * 65535.0 / (vh - 1);
 
   INPUT input{};
   input.type = INPUT_MOUSE;
@@ -48,7 +145,7 @@ std::expected<LogicalPoint, Error> WinMouseBackend::cursorPosition() {
         Error::platformError("GetCursorPos", static_cast<long>(GetLastError()))
     );
   }
-  return LogicalPoint{static_cast<double>(p.x), static_cast<double>(p.y)};
+  return toLogicalPoint(p);
 }
 
 std::expected<void, Error> WinMouseBackend::button(
@@ -93,17 +190,17 @@ std::expected<void, Error> WinMouseBackend::button(
 }
 
 std::expected<void, Error> WinMouseBackend::scroll(const ScrollDelta delta) {
-  // WHEEL_DELTA (120) is one notch. Line deltas scale by WHEEL_DELTA; pixel
-  // deltas are passed through as raw wheel units, which is the finest resolution
-  // the SendInput wheel API exposes (true per-pixel high-resolution scrolling is
-  // only available to the Windows Precision Touchpad driver stack, not to
-  // synthetic SendInput, so pixel mode here is best-effort granular rather than
-  // sub-notch). Vertical > 0 scrolls up, matching the library convention.
-  const auto scale = [&](const double v) -> LONG {
-    if (delta.unit == ScrollUnit::Line) {
-      return static_cast<LONG>(std::lround(v * WHEEL_DELTA));
-    }
-    return static_cast<LONG>(std::lround(v));
+  if (delta.unit == ScrollUnit::Pixel) {
+    return std::unexpected(Error::unsupported(
+        "pixel-precise scrolling is unavailable through SendInput; use line "
+        "units"
+    ));
+  }
+
+  // WHEEL_DELTA (120) is one notch. Vertical > 0 scrolls up, matching the
+  // library convention.
+  const auto scale = [](const double v) -> LONG {
+    return static_cast<LONG>(std::lround(v * WHEEL_DELTA));
   };
 
   if (delta.vertical != 0.0) {

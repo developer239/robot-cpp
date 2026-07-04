@@ -1,5 +1,6 @@
 #include "X11EventTapBackend.h"
 
+#include <X11/XKBlib.h>
 #include <X11/Xproto.h>
 #include <X11/extensions/record.h>
 #include <X11/keysym.h>

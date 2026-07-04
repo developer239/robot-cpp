@@ -18,7 +18,7 @@ struct Row {
   bool extended;
 };
 
-constexpr std::array<Row, 110> kTable{{
+constexpr auto kTable = std::to_array<Row>({
     // Letters (positional).
     {Key::A, 0x1E, false}, {Key::B, 0x30, false}, {Key::C, 0x2E, false},
     {Key::D, 0x20, false}, {Key::E, 0x12, false}, {Key::F, 0x21, false},
@@ -78,7 +78,7 @@ constexpr std::array<Row, 110> kTable{{
     {Key::LeftAlt, 0x38, false}, {Key::LeftMeta, 0x5B, true},
     {Key::RightControl, 0x1D, true}, {Key::RightShift, 0x36, false},
     {Key::RightAlt, 0x38, true}, {Key::RightMeta, 0x5C, true},
-}};
+});
 
 }  // namespace
 
