@@ -1,9 +1,6 @@
 # robot-cpp
 
-[![Linux (GCC 14)](https://github.com/developer239/robot-cpp/actions/workflows/ci.yml/badge.svg)](https://github.com/developer239/robot-cpp/actions/workflows/ci.yml)
-[![macOS (Apple Clang)](https://github.com/developer239/robot-cpp/actions/workflows/ci.yml/badge.svg)](https://github.com/developer239/robot-cpp/actions/workflows/ci.yml)
-[![Windows (MSVC)](https://github.com/developer239/robot-cpp/actions/workflows/ci.yml/badge.svg)](https://github.com/developer239/robot-cpp/actions/workflows/ci.yml)
-[![Sanitizers (ASan + UBSan)](https://github.com/developer239/robot-cpp/actions/workflows/ci.yml/badge.svg)](https://github.com/developer239/robot-cpp/actions/workflows/ci.yml)
+[![CI](https://github.com/developer239/robot-cpp/actions/workflows/ci.yml/badge.svg)](https://github.com/developer239/robot-cpp/actions/workflows/ci.yml)
 
 robot-cpp is a C++23 library for programmatic keyboard, mouse, and screen control on macOS, Windows, and Linux. It injects synthetic input, captures the screen at native resolution, and records and replays global input events, all behind a single `Session` object that owns the platform backend and reports what it can and cannot do in the current environment.
 
