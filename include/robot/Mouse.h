@@ -51,6 +51,12 @@ class Mouse {
   [[nodiscard]] std::expected<void, Error> press(MouseButton button);
   [[nodiscard]] std::expected<void, Error> release(MouseButton button);
 
+  // Raw button transition with an explicit click count. This is the atom used by
+  // higher-level language bindings that compose multi-click gestures themselves.
+  [[nodiscard]] std::expected<void, Error> button(
+      MouseButton button, ButtonAction action, int clickCount
+  );
+
   // Press then release at the current position. X1/X2 require
   // supportsExtraMouseButtons or the call fails with Unsupported.
   [[nodiscard]] std::expected<void, Error> click(

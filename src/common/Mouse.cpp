@@ -62,6 +62,12 @@ std::expected<void, Error> Mouse::release(const MouseButton button) {
   return backend_->button(button, ButtonAction::Up, 1);
 }
 
+std::expected<void, Error> Mouse::button(
+    const MouseButton button, const ButtonAction action, const int clickCount
+) {
+  return backend_->button(button, action, clickCount);
+}
+
 std::expected<void, Error> Mouse::click(const MouseButton button) {
   if (auto r = backend_->button(button, ButtonAction::Down, 1); !r) return r;
   return backend_->button(button, ButtonAction::Up, 1);
