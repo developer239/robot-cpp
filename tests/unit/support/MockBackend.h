@@ -115,6 +115,7 @@ class MockPlatformBackend final : public backend::IPlatformBackend {
   backend::IMouseBackend& mouse() override { return mouse_; }
   backend::IScreenBackend& screen() override { return screen_; }
   backend::IEventTapBackend* eventTap() override { return nullptr; }
+  backend::IWindowBackend* windows() override { return nullptr; }
   const Capabilities& capabilities() const override { return capabilities_; }
 
   std::vector<RecordedCall>& log() { return log_; }

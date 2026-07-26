@@ -20,17 +20,18 @@ robot-cpp is built around the distinctions those libraries collapse:
 - Move the cursor (absolute or smoothly interpolated), click, double-click, drag, and scroll, with buttons through X1/X2 and line- or pixel-unit scrolling.
 - Press and release physical keys by position, build modifier chords, and type arbitrary Unicode text independent of the active keyboard layout.
 - Enumerate every display with its own scale factor and both logical and physical bounds, capture any region or a whole monitor at native pixel resolution, sample individual pixels, and encode captures as PNG.
+- Enumerate on-screen application windows, query their current bounds and z-order, activate their owning application, and stream a single window as zero-copy video frames carrying the density and content-rect metadata needed to map frame pixels back to desktop coordinates (macOS ScreenCaptureKit; reported as Unsupported elsewhere until those backends exist).
 - Record global mouse and keyboard input and replay it with its original timing.
 - Report per-environment capabilities and return typed errors instead of failing silently.
 
 ## Supported platforms
 
-| Platform          | Backend                       | Injection                       | Capture | Recording |
-| ----------------- | ----------------------------- | ------------------------------- | ------- | --------- |
-| macOS             | Quartz (CoreGraphics)         | yes (needs Accessibility)       | yes (needs Screen Recording) | yes (needs Accessibility) |
-| Windows           | SendInput + GDI               | yes                             | yes     | yes       |
-| Linux (X11)       | XTest + XRandR + XRecord      | yes                             | yes     | yes       |
-| Linux (Wayland)   | uinput (opt-in)               | keyboard + relative mouse only  | no      | no        |
+| Platform          | Backend                       | Injection                       | Capture | Window streaming | Recording |
+| ----------------- | ----------------------------- | ------------------------------- | ------- | ---------------- | --------- |
+| macOS             | Quartz + ScreenCaptureKit     | yes (needs Accessibility)       | yes (needs Screen Recording) | yes (needs Screen Recording) | yes (needs Accessibility) |
+| Windows           | SendInput + GDI               | yes                             | yes     | no               | yes       |
+| Linux (X11)       | XTest + XRandR + XRecord      | yes                             | yes     | no               | yes       |
+| Linux (Wayland)   | uinput (opt-in)               | keyboard + relative mouse only  | no      | no               | no        |
 
 Wayland does not expose a protocol for an unprivileged client to inject input, warp the cursor, or capture the screen. Under a native Wayland session robot-cpp either runs through Xwayland (the X11 backend) or through the kernel-level uinput backend, with the limits above reported explicitly. See [Platform limitations](#platform-limitations) for the details.
 
@@ -206,6 +207,38 @@ if (auto color = screen.pixel({100, 200})) {
   std::println("rgba({}, {}, {}, {})", color->r, color->g, color->b, color->a);
 }
 ```
+
+## Windows
+
+Window enumeration and streaming live on `session->windows()`. Streaming is push-based: frames arrive on an internal capture thread, serialized and in order, as `VideoFrame` values that share (never copy) the platform pixel buffer. Each frame carries the scale and content-rect metadata needed to map its pixels back to window coordinates - `robot::toWindowPoint()` is the one implementation of that formula. On macOS, access the pixels through the typed bridge in `robot/mac/VideoFrame.h`.
+
+```cpp
+robot::Windows& windows = (*session)->windows();
+
+// Pick a window (list() needs canEnumerateWindows):
+auto list = windows.list();
+const robot::Window& target = (*list)[0];
+
+// Stream it. The callback must hand the frame off quickly and never call
+// back into robot-cpp.
+auto stream = windows.stream(
+    target.id, {.maxFps = 60.0},
+    [&](const robot::VideoFrame& frame) { mailbox.publish(frame); },
+    [&](const robot::Error& error) { std::println("stream died: {}", error.message); });
+
+// ... later. After stop() returns no callback is running or will start.
+stream->stop();
+
+// Input coordinate math: re-read the window's current bounds, then map a
+// frame pixel to desktop coordinates.
+if (auto point = robot::toWindowPoint(frame.info(), pixelX, pixelY)) {
+  auto bounds = windows.frame(target.id);
+  robot::LogicalPoint global{bounds->origin.x + point->x,
+                             bounds->origin.y + point->y};
+}
+```
+
+`topmostWindowId()` reports the topmost normal-layer window in z-order (an ordering query - the honest primitive for "is my target frontmost"), and `activateApplicationFor(windowId)` brings a window's owning application forward; which of its windows ends up on top is the OS's decision.
 
 ## Recording and replay
 

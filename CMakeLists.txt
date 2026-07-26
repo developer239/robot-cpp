@@ -62,12 +62,17 @@ set(ROBOT_COMMON_SOURCES
     src/common/Image.cpp
     src/common/Recorder.cpp
     src/common/EventTap.cpp
+    src/common/Windows.cpp
 )
 
 # ── Platform selection: exactly one directory is compiled ─────────────────────
 # This is the single compile boundary. No consumer translation unit contains a
 # platform #ifdef; the platform is chosen here, once.
 if(APPLE)
+    # The window backend talks to ScreenCaptureKit, which has no C API.
+    enable_language(OBJCXX)
+    set(CMAKE_OBJCXX_STANDARD 23)
+    set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
     set(ROBOT_PLATFORM_SOURCES
         src/platform/macos/MacBackendFactory.cpp
         src/platform/macos/MacKeyMap.cpp
@@ -75,6 +80,10 @@ if(APPLE)
         src/platform/macos/MacMouseBackend.cpp
         src/platform/macos/MacScreenBackend.cpp
         src/platform/macos/MacEventTapBackend.cpp
+        src/platform/macos/MacWindowBackend.mm
+    )
+    set_source_files_properties(src/platform/macos/MacWindowBackend.mm
+        PROPERTIES COMPILE_OPTIONS "-fobjc-arc"
     )
 elseif(WIN32)
     set(ROBOT_PLATFORM_SOURCES
@@ -136,9 +145,19 @@ set_target_properties(robot PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # ── Platform dependencies, scoped per target ──────────────────────────────────
 if(APPLE)
     find_library(APPLICATION_SERVICES ApplicationServices REQUIRED)
-    # ApplicationServices types appear only in .cpp files (behind the backend
-    # interfaces), so the dependency is PRIVATE. Carbon is intentionally NOT used.
-    target_link_libraries(robot PRIVATE ${APPLICATION_SERVICES})
+    find_library(SCREEN_CAPTURE_KIT ScreenCaptureKit REQUIRED)
+    find_library(CORE_MEDIA CoreMedia REQUIRED)
+    find_library(CORE_VIDEO CoreVideo REQUIRED)
+    find_library(APP_KIT AppKit REQUIRED)
+    # Platform framework types appear only in the platform .cpp/.mm files
+    # (behind the backend interfaces), so the dependencies are PRIVATE. Carbon
+    # is intentionally NOT used.
+    target_link_libraries(robot PRIVATE
+        ${APPLICATION_SERVICES}
+        ${SCREEN_CAPTURE_KIT}
+        ${CORE_MEDIA}
+        ${CORE_VIDEO}
+        ${APP_KIT})
 elseif(WIN32)
     # user32/gdi32 for SendInput, hooks, GDI capture. Shcore and the DPI context
     # API are resolved at runtime (see WinDpi.cpp / WinScreenBackend.cpp), so they

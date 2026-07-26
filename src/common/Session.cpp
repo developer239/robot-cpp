@@ -25,7 +25,8 @@ Session::Session(
       keyboard_(backend_->keyboard()),
       mouse_(backend_->mouse()),
       screen_(backend_->screen()),
-      eventTap_(backend_->eventTap()) {}
+      eventTap_(backend_->eventTap()),
+      windows_(backend_->windows()) {}
 
 // Defined here, where IPlatformBackend is complete, so unique_ptr can destroy it.
 Session::~Session() = default;

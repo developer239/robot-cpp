@@ -12,6 +12,7 @@
 #include "robot/Monitor.h"
 #include "robot/Mouse.h"
 #include "robot/Screen.h"
+#include "robot/Windows.h"
 
 namespace robot {
 namespace backend {
@@ -73,6 +74,10 @@ class Session {
   // implementation (see EventTap).
   [[nodiscard]] EventTap& eventTap() { return eventTap_; }
 
+  // Always present; calls report Unsupported if this platform build has no
+  // window enumeration/capture implementation (see Windows).
+  [[nodiscard]] Windows& windows() { return windows_; }
+
   [[nodiscard]] const Capabilities& capabilities() const {
     return capabilities_;
   }
@@ -96,6 +101,7 @@ class Session {
   Mouse mouse_;
   Screen screen_;
   EventTap eventTap_;
+  Windows windows_;
 };
 
 }  // namespace robot

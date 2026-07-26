@@ -5,6 +5,7 @@
 #include "robot/backend/IKeyboardBackend.h"
 #include "robot/backend/IMouseBackend.h"
 #include "robot/backend/IScreenBackend.h"
+#include "robot/backend/IWindowBackend.h"
 
 namespace robot::backend {
 
@@ -28,6 +29,9 @@ class IPlatformBackend {
 
   // nullptr when this platform build provides no global input tap.
   [[nodiscard]] virtual IEventTapBackend* eventTap() = 0;
+
+  // nullptr when this platform build provides no window enumeration/capture.
+  [[nodiscard]] virtual IWindowBackend* windows() = 0;
 
   [[nodiscard]] virtual const Capabilities& capabilities() const = 0;
 };
