@@ -6,6 +6,7 @@
 #include "MacKeyboardBackend.h"
 #include "MacMouseBackend.h"
 #include "MacScreenBackend.h"
+#include "MacWindowBackend.h"
 #include "robot/backend/IPlatformBackend.h"
 
 namespace robot::mac {
@@ -19,12 +20,14 @@ class MacPlatformBackend final : public backend::IPlatformBackend {
         keyboard_(std::make_unique<MacKeyboardBackend>()),
         mouse_(std::make_unique<MacMouseBackend>()),
         screen_(std::make_unique<MacScreenBackend>()),
-        eventTap_(std::make_unique<MacEventTapBackend>()) {}
+        eventTap_(std::make_unique<MacEventTapBackend>()),
+        windows_(std::make_unique<MacWindowBackend>()) {}
 
   backend::IKeyboardBackend& keyboard() override { return *keyboard_; }
   backend::IMouseBackend& mouse() override { return *mouse_; }
   backend::IScreenBackend& screen() override { return *screen_; }
   backend::IEventTapBackend* eventTap() override { return eventTap_.get(); }
+  backend::IWindowBackend* windows() override { return windows_.get(); }
   const Capabilities& capabilities() const override { return capabilities_; }
 
  private:
@@ -33,6 +36,7 @@ class MacPlatformBackend final : public backend::IPlatformBackend {
   std::unique_ptr<MacMouseBackend> mouse_;
   std::unique_ptr<MacScreenBackend> screen_;
   std::unique_ptr<MacEventTapBackend> eventTap_;
+  std::unique_ptr<MacWindowBackend> windows_;
 };
 
 }  // namespace robot::mac

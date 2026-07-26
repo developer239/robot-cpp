@@ -25,6 +25,8 @@ enum class ErrorCode : std::uint16_t {
   InvalidArgument,
   // A referenced monitor id does not exist.
   MonitorNotFound,
+  // A referenced window id no longer exists on screen.
+  WindowNotFound,
   // A character or key cannot be represented by the active keyboard layout or
   // injection method.
   UnmappableInput,
@@ -44,6 +46,7 @@ constexpr std::string_view toString(const ErrorCode code) {
     case ErrorCode::BackendUnavailable: return "BackendUnavailable";
     case ErrorCode::InvalidArgument: return "InvalidArgument";
     case ErrorCode::MonitorNotFound: return "MonitorNotFound";
+    case ErrorCode::WindowNotFound: return "WindowNotFound";
     case ErrorCode::UnmappableInput: return "UnmappableInput";
     case ErrorCode::CaptureFailed: return "CaptureFailed";
     case ErrorCode::EncodeFailed: return "EncodeFailed";
@@ -78,6 +81,10 @@ struct Error {
   }
   static Error monitorNotFound(const std::uint32_t id) {
     return {ErrorCode::MonitorNotFound, std::format("Monitor {} not found", id)};
+  }
+  static Error windowNotFound(const std::uint32_t id) {
+    return {ErrorCode::WindowNotFound,
+            std::format("Window {} no longer exists on screen", id)};
   }
   static Error unmappableInput(std::string_view detail) {
     return {ErrorCode::UnmappableInput,

@@ -25,6 +25,8 @@ class WinPlatformBackend final : public backend::IPlatformBackend {
   backend::IMouseBackend& mouse() override { return *mouse_; }
   backend::IScreenBackend& screen() override { return *screen_; }
   backend::IEventTapBackend* eventTap() override { return eventTap_.get(); }
+  // Window enumeration/capture is not implemented on this platform yet.
+  backend::IWindowBackend* windows() override { return nullptr; }
   const Capabilities& capabilities() const override { return capabilities_; }
 
  private:

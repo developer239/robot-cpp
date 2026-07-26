@@ -36,6 +36,11 @@ Capabilities buildCapabilities(const bool ax, const bool sr) {
 
   c.canCaptureScreen = sr;
 
+  // Window titles from CGWindowList and ScreenCaptureKit enumeration are both
+  // gated behind Screen Recording, same as pixel capture.
+  c.canEnumerateWindows = sr;
+  c.canStreamWindows = sr;
+
   c.requiresAccessibilityPermission = true;
   c.requiresScreenRecordingPermission = true;
   return c;

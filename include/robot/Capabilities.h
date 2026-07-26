@@ -33,6 +33,8 @@ struct Capabilities {
 
   bool canCaptureScreen = false;
   bool canEnumerateMonitors = false;
+  bool canEnumerateWindows = false;   // Window list, frame, and focus queries.
+  bool canStreamWindows = false;      // Push-based per-window capture streams.
   bool canRecordEvents = false;  // Global input tap / hook.
 
   bool requiresAccessibilityPermission = false;

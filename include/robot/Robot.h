@@ -23,3 +23,7 @@
 #include "robot/Scroll.h"
 #include "robot/Screen.h"
 #include "robot/Session.h"
+#include "robot/VideoFrame.h"
+#include "robot/Window.h"
+#include "robot/Windows.h"
+#include "robot/WindowStream.h"
