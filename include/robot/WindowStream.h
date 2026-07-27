@@ -12,7 +12,7 @@ class IWindowStreamBackend;
 }
 
 struct WindowStreamOptions {
-  double maxFps = 60.0;
+  double maxFps = 60.0;  // must be finite and in [1, 1000]
   bool showsCursor = true;
 };
 
@@ -24,7 +24,9 @@ using VideoFrameCallback = std::function<void(const VideoFrame&)>;
 
 // Invoked on the same capture thread (serialized with frame delivery) when
 // the stream dies outside stop(): the window closed, the OS revoked capture,
-// the display reconfigured. After it fires, isRunning() is false and no
+// the display reconfigured. Fires at most once; a death that happens before a
+// concurrent stop() is always reported, while stop() winning the race means a
+// clean stop and no error. After it fires, isRunning() is false and no
 // further frames arrive. Same rules as VideoFrameCallback.
 using StreamErrorCallback = std::function<void(const Error&)>;
 
