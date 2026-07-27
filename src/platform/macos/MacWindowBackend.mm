@@ -5,6 +5,8 @@
 #import <CoreMedia/CoreMedia.h>
 #import <ScreenCaptureKit/ScreenCaptureKit.h>
 
+#include <mach/mach_time.h>
+
 #include <atomic>
 #include <chrono>
 #include <memory>
@@ -52,6 +54,7 @@ struct StreamChannel {
   double scaleFactor = 0.0;
   double contentScale = 0.0;
   CGRect contentRect = CGRectZero;
+  std::optional<std::uint64_t> displayTicks;
   CFArrayRef attachments =
       CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, false);
   if (attachments != nullptr && CFArrayGetCount(attachments) > 0) {
@@ -88,6 +91,15 @@ struct StreamChannel {
     if (contentRectDict != nullptr) {
       CGRectMakeWithDictionaryRepresentation(contentRectDict, &contentRect);
     }
+    const auto* displayTimeNumber =
+        static_cast<CFNumberRef>(CFDictionaryGetValue(
+            attachment, (__bridge CFStringRef)SCStreamFrameInfoDisplayTime
+        ));
+    if (displayTimeNumber != nullptr) {
+      std::int64_t ticks = 0;
+      CFNumberGetValue(displayTimeNumber, kCFNumberSInt64Type, &ticks);
+      if (ticks > 0) displayTicks = static_cast<std::uint64_t>(ticks);
+    }
   }
 
   CVPixelBufferRef pixels = CMSampleBufferGetImageBuffer(sampleBuffer);
@@ -95,12 +107,29 @@ struct StreamChannel {
 
   // Stamp the frame with when it was presented, not when this callback ran -
   // a sample delayed inside ScreenCaptureKit must not look fresh to
-  // freshness-gated consumers. Presentation time and the host clock share the
-  // same time base, so the age subtraction is exact.
+  // freshness-gated consumers. SCStreamFrameInfoDisplayTime is the display
+  // time in mach absolute ticks, the same clock mach_absolute_time() reads,
+  // so the age subtraction stays within one clock domain. When the attachment
+  // is absent, fall back to the sample's presentation timestamp measured
+  // against the CoreMedia host clock it is produced on.
   auto capturedAt = std::chrono::steady_clock::now();
-  const CMTime presentation =
-      CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
-  if (CMTIME_IS_VALID(presentation)) {
+  if (displayTicks) {
+    static const double nanosPerTick = [] {
+      mach_timebase_info_data_t timebase{};
+      mach_timebase_info(&timebase);
+      return static_cast<double>(timebase.numer) /
+             static_cast<double>(timebase.denom);
+    }();
+    const double ageNanos =
+        (static_cast<double>(mach_absolute_time()) -
+         static_cast<double>(*displayTicks)) *
+        nanosPerTick;
+    capturedAt -= std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+        std::chrono::duration<double, std::nano>(ageNanos)
+    );
+  } else if (const CMTime presentation =
+                 CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+             CMTIME_IS_VALID(presentation)) {
     const CMTime hostNow = CMClockGetTime(CMClockGetHostTimeClock());
     const double ageSeconds =
         CMTimeGetSeconds(CMTimeSubtract(hostNow, presentation));
@@ -135,19 +164,31 @@ struct StreamChannel {
   ));
 }
 
-- (void)stream:(SCStream*)stream didStopWithError:(NSError*)error {
-  const auto chan = self->channel;
+// Shared death path for didStopWithError and streamDidBecomeInactive. The
+// active flag flips synchronously on the delegate thread, so a death that
+// happens before a concurrent stop() wins the exchange and its report cannot
+// be suppressed; delivery still hops onto the sample handler queue so it is
+// serialized with frame delivery and covered by stop()'s drain.
+static void reportStreamDeath(
+    const std::shared_ptr<robot::mac::StreamChannel>& chan, NSString* message
+) {
   if (chan == nullptr || chan->queue == nil) return;
-  // Delegate callbacks arrive on ScreenCaptureKit's own queue; hop onto the
-  // sample handler queue so error delivery is serialized with frame delivery
-  // and covered by stop()'s drain. Only report deaths the caller did not
-  // initiate - stop() deactivates the channel first.
-  NSString* message = error.localizedDescription;
+  if (!chan->active.exchange(false)) return;  // stop() already initiated
+  if (chan->onError == nullptr) return;
   dispatch_async(chan->queue, ^{
-    if (chan->active.exchange(false) && chan->onError != nullptr) {
-      chan->onError(robot::Error::captureFailed(message.UTF8String));
-    }
+    chan->onError(robot::Error::captureFailed(message.UTF8String));
   });
+}
+
+- (void)stream:(SCStream*)stream didStopWithError:(NSError*)error {
+  reportStreamDeath(self->channel, error.localizedDescription);
+}
+
+- (void)streamDidBecomeInactive:(SCStream*)stream {
+  reportStreamDeath(
+      self->channel,
+      @"stream became inactive (the captured window closed or capture ended)"
+  );
 }
 
 @end
@@ -379,6 +420,16 @@ MacWindowBackend::startStream(
     const std::uint32_t windowId, const WindowStreamOptions& options,
     VideoFrameCallback onFrame, StreamErrorCallback onError
 ) {
+  // SCContentFilter.pointPixelScale and .contentRect - the metadata the whole
+  // coordinate contract rests on - exist since macOS 14.
+  if (@available(macOS 14.0, *)) {
+    // Streaming is available; continue below.
+  } else {
+    return std::unexpected(
+        Error::unsupported("window streaming requires macOS 14 or newer")
+    );
+  }
+
   auto contentResult = fetchShareableContent();
   if (!contentResult) return std::unexpected(contentResult.error());
 

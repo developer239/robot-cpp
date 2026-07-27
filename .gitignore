@@ -8,7 +8,7 @@
 /example/cmake-build-debug
 
 
-/build
+/build*
 
 /.opencode
 /AGENTS.md

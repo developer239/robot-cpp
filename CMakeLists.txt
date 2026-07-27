@@ -149,15 +149,19 @@ if(APPLE)
     find_library(CORE_MEDIA CoreMedia REQUIRED)
     find_library(CORE_VIDEO CoreVideo REQUIRED)
     find_library(APP_KIT AppKit REQUIRED)
-    # Platform framework types appear only in the platform .cpp/.mm files
-    # (behind the backend interfaces), so the dependencies are PRIVATE. Carbon
-    # is intentionally NOT used.
-    target_link_libraries(robot PRIVATE
-        ${APPLICATION_SERVICES}
-        ${SCREEN_CAPTURE_KIT}
-        ${CORE_MEDIA}
-        ${CORE_VIDEO}
-        ${APP_KIT})
+    # Most platform framework types appear only in the platform .cpp/.mm files
+    # (behind the backend interfaces), so those dependencies are PRIVATE.
+    # CoreVideo is PUBLIC because the installed robot/mac/VideoFrame.h bridge
+    # hands consumers a CVPixelBufferRef they lock through CoreVideo calls.
+    # Carbon is intentionally NOT used.
+    target_link_libraries(robot
+        PUBLIC
+            ${CORE_VIDEO}
+        PRIVATE
+            ${APPLICATION_SERVICES}
+            ${SCREEN_CAPTURE_KIT}
+            ${CORE_MEDIA}
+            ${APP_KIT})
 elseif(WIN32)
     # user32/gdi32 for SendInput, hooks, GDI capture. Shcore and the DPI context
     # API are resolved at runtime (see WinDpi.cpp / WinScreenBackend.cpp), so they

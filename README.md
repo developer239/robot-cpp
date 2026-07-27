@@ -28,7 +28,7 @@ robot-cpp is built around the distinctions those libraries collapse:
 
 | Platform          | Backend                       | Injection                       | Capture | Window streaming | Recording |
 | ----------------- | ----------------------------- | ------------------------------- | ------- | ---------------- | --------- |
-| macOS             | Quartz + ScreenCaptureKit     | yes (needs Accessibility)       | yes (needs Screen Recording) | yes (needs Screen Recording) | yes (needs Accessibility) |
+| macOS             | Quartz + ScreenCaptureKit     | yes (needs Accessibility)       | yes (needs Screen Recording) | yes (macOS 14+, needs Screen Recording) | yes (needs Accessibility) |
 | Windows           | SendInput + GDI               | yes                             | yes     | no               | yes       |
 | Linux (X11)       | XTest + XRandR + XRecord      | yes                             | yes     | no               | yes       |
 | Linux (Wayland)   | uinput (opt-in)               | keyboard + relative mouse only  | no      | no               | no        |

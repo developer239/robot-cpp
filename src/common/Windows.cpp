@@ -1,5 +1,7 @@
 #include "robot/Windows.h"
 
+#include <cmath>
+#include <format>
 #include <utility>
 
 #include "robot/backend/IWindowBackend.h"
@@ -68,6 +70,12 @@ std::expected<WindowStream, Error> Windows::stream(
     return std::unexpected(
         Error::invalidArgument("stream() requires a frame callback")
     );
+  }
+  if (!std::isfinite(options.maxFps) || options.maxFps < 1.0 ||
+      options.maxFps > 1000.0) {
+    return std::unexpected(Error::invalidArgument(std::format(
+        "maxFps must be a finite value in [1, 1000], got {}", options.maxFps
+    )));
   }
 
   auto stream = backend_->startStream(
