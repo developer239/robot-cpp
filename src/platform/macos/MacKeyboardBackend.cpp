@@ -101,6 +101,10 @@ std::expected<void, Error> MacKeyboardBackend::typeUnicode(
   CGEventKeyboardSetUnicodeString(
       up, static_cast<UniCharCount>(len), utf16.data()
   );
+  // A new event's default flags come from the source's private state, which
+  // can still count a released modifier as held, so they are cleared here.
+  CGEventSetFlags(down, 0);
+  CGEventSetFlags(up, 0);
   CGEventPost(kCGHIDEventTap, down);
   CGEventPost(kCGHIDEventTap, up);
   CFRelease(down);
