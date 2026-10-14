@@ -137,6 +137,7 @@ std::expected<void, Error> X11EventTapBackend::start(EventSink sink) {
     data_ = nullptr;
     return std::unexpected(Error::platformError("XRecordCreateContext"));
   }
+  XSync(control_, False);
   context_ = reinterpret_cast<void*>(ctx);
 
   g_state = TapState{this, control_, &sink_};
