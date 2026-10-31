@@ -25,7 +25,8 @@ struct VideoFrameInfo {
   // padding, resize letterboxing), so this is part of the contract.
   LogicalRect contentRect;
   // Presentation timestamp mapped onto steady_clock (not delivery time), so
-  // frame age reflects how old the pixels actually are.
+  // frame age reflects how old the pixels actually are. macOS can deliver a
+  // frame before its display time, which makes this a few ms in the future.
   std::chrono::steady_clock::time_point capturedAt;
 };
 

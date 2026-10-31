@@ -209,13 +209,15 @@ std::int32_t intValue(CFDictionaryRef dict, CFStringRef key) {
   return value;
 }
 
-std::expected<SCShareableContent*, Error> fetchShareableContent() {
+std::expected<SCShareableContent*, Error> fetchShareableContent(
+    const BOOL isOnScreenOnly = YES
+) {
   dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
   __block SCShareableContent* content = nil;
   __block NSError* error = nil;
   [SCShareableContent
       getShareableContentExcludingDesktopWindows:YES
-                             onScreenWindowsOnly:YES
+                             onScreenWindowsOnly:isOnScreenOnly
                                completionHandler:^(
                                    SCShareableContent* result, NSError* err
                                ) {
@@ -538,7 +540,9 @@ MacWindowBackend::startMonitorStream(
     );
   }
 
-  auto contentResult = fetchShareableContent();
+  // Includes windows not on screen yet: a caller that creates its overlay just
+  // before streaming would otherwise not be listed, and so not be excluded.
+  auto contentResult = fetchShareableContent(NO);
   if (!contentResult) return std::unexpected(contentResult.error());
 
   SCDisplay* scDisplay = nil;
