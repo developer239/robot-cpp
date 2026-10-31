@@ -68,6 +68,15 @@ class IWindowBackend {
       std::uint32_t windowId, const WindowStreamOptions& options,
       VideoFrameCallback onFrame, StreamErrorCallback onError
   ) = 0;
+
+  // Starts streaming a whole monitor, under the same delivery rules. Frames
+  // report windowId 0.
+  [[nodiscard]] virtual std::expected<
+      std::unique_ptr<IWindowStreamBackend>, Error>
+  startMonitorStream(
+      std::uint32_t monitorId, const WindowStreamOptions& options,
+      VideoFrameCallback onFrame, StreamErrorCallback onError
+  ) = 0;
 };
 
 }  // namespace robot::backend

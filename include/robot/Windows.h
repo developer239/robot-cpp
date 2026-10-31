@@ -60,7 +60,18 @@ class Windows {
       VideoFrameCallback onFrame, StreamErrorCallback onError = nullptr
   );
 
+  // Starts streaming a whole monitor, by Monitor::id. For an overlay, or for
+  // following anything on the desktop rather than one window.
+  [[nodiscard]] std::expected<WindowStream, Error> streamMonitor(
+      std::uint32_t monitorId, const WindowStreamOptions& options,
+      VideoFrameCallback onFrame, StreamErrorCallback onError = nullptr
+  );
+
  private:
+  [[nodiscard]] std::expected<void, Error> validateStream(
+      const WindowStreamOptions& options, const VideoFrameCallback& onFrame
+  ) const;
+
   backend::IWindowBackend* backend_;
 };
 
