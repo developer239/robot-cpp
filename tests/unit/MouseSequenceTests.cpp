@@ -24,6 +24,19 @@ TEST(MouseSequence, DoubleClickReportsSecondClickCount) {
   EXPECT_EQ(log[2].clickCount, 2);  // Native double-click detection depends on this.
 }
 
+TEST(MouseSequence, MoveByForwardsTheDeltaWithoutWarping) {
+  MockPlatformBackend backend;
+  Mouse mouse(backend.mouse());
+
+  ASSERT_TRUE(mouse.moveBy(12.0, -7.0).has_value());
+
+  const auto& log = backend.log();
+  ASSERT_EQ(log.size(), 1u);
+  EXPECT_EQ(log[0].kind, RecordedCall::Kind::MoveRelative);
+  EXPECT_DOUBLE_EQ(log[0].point.x, 12.0);
+  EXPECT_DOUBLE_EQ(log[0].point.y, -7.0);
+}
+
 TEST(MouseSequence, DragPressesMovesThenReleases) {
   MockPlatformBackend backend;
   backend.mockMouse().setPosition({0.0, 0.0});

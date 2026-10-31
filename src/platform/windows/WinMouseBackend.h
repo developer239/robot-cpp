@@ -23,6 +23,9 @@ namespace robot::win {
 class WinMouseBackend final : public backend::IMouseBackend {
  public:
   std::expected<void, Error> warpCursor(LogicalPoint point) override;
+  std::expected<void, Error> moveRelative(
+      double deltaX, double deltaY
+  ) override;
   std::expected<LogicalPoint, Error> cursorPosition() override;
   std::expected<void, Error> button(
       MouseButton button, ButtonAction action, int clickCount

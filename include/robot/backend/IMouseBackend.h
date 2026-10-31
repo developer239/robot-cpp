@@ -30,6 +30,13 @@ class IMouseBackend {
       LogicalPoint point
   ) = 0;
 
+  // Relative motion, reported to the OS as a raw delta. This is what software
+  // that captures the cursor (game cameras, mouse steering) reads; an absolute
+  // warp does not produce usable deltas there.
+  [[nodiscard]] virtual std::expected<void, Error> moveRelative(
+      double deltaX, double deltaY
+  ) = 0;
+
   // Current pointer position. ErrorCode::Unsupported where it cannot be read.
   [[nodiscard]] virtual std::expected<LogicalPoint, Error> cursorPosition() = 0;
 

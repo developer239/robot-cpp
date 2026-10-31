@@ -15,7 +15,7 @@ namespace robot::test {
 struct RecordedCall {
   enum class Kind {
     KeyDown, KeyUp, TypeUnicode,
-    Warp, CursorPos, Button, Scroll,
+    Warp, MoveRelative, CursorPos, Button, Scroll,
     Enumerate, Capture,
   };
   Kind kind;
@@ -54,6 +54,12 @@ class MockMouse final : public backend::IMouseBackend {
   std::expected<void, Error> warpCursor(LogicalPoint p) override {
     position_ = p;
     log_->push_back({.kind = RecordedCall::Kind::Warp, .point = p});
+    return {};
+  }
+  std::expected<void, Error> moveRelative(double deltaX, double deltaY) override {
+    log_->push_back(
+        {.kind = RecordedCall::Kind::MoveRelative, .point = {deltaX, deltaY}}
+    );
     return {};
   }
   std::expected<LogicalPoint, Error> cursorPosition() override {

@@ -74,6 +74,35 @@ std::expected<void, Error> MacMouseBackend::warpCursor(const LogicalPoint point)
   return {};
 }
 
+std::expected<void, Error> MacMouseBackend::moveRelative(
+    const double deltaX, const double deltaY
+) {
+  auto here = cursorPosition();
+  if (!here) return std::unexpected(here.error());
+
+  const CGPoint target = CGPointMake(here->x + deltaX, here->y + deltaY);
+  const CGEventType type =
+      pressedButton_ ? dragType(*pressedButton_) : kCGEventMouseMoved;
+  const CGMouseButton btn =
+      pressedButton_ ? cgButton(*pressedButton_) : kCGMouseButtonLeft;
+
+  CGEventRef event = CGEventCreateMouseEvent(source_, type, target, btn);
+  if (event == nullptr) {
+    return std::unexpected(Error::platformError("CGEventCreateMouseEvent"));
+  }
+
+  // Applications that captured the cursor read these fields, not the location.
+  CGEventSetIntegerValueField(
+      event, kCGMouseEventDeltaX, static_cast<int64_t>(std::lround(deltaX))
+  );
+  CGEventSetIntegerValueField(
+      event, kCGMouseEventDeltaY, static_cast<int64_t>(std::lround(deltaY))
+  );
+  CGEventPost(kCGHIDEventTap, event);
+  CFRelease(event);
+  return {};
+}
+
 std::expected<LogicalPoint, Error> MacMouseBackend::cursorPosition() {
   CGEventRef event = CGEventCreate(nullptr);
   if (event == nullptr) {

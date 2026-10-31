@@ -123,6 +123,17 @@ std::expected<void, Error> UinputBackend::warpCursor(LogicalPoint /*point*/) {
   ));
 }
 
+std::expected<void, Error> UinputBackend::moveRelative(
+    const double deltaX, const double deltaY
+) {
+  const auto dx = static_cast<std::int32_t>(std::lround(deltaX));
+  const auto dy = static_cast<std::int32_t>(std::lround(deltaY));
+
+  if (auto r = writeEvent(fd_, EV_REL, REL_X, dx); !r) return r;
+  if (auto r = writeEvent(fd_, EV_REL, REL_Y, dy); !r) return r;
+  return writeEvent(fd_, EV_SYN, SYN_REPORT, 0);
+}
+
 std::expected<LogicalPoint, Error> UinputBackend::cursorPosition() {
   return std::unexpected(Error::unsupported(
       "reading the global pointer position is unavailable through uinput"

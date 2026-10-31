@@ -138,6 +138,17 @@ std::expected<void, Error> WinMouseBackend::warpCursor(const LogicalPoint point)
   return send(input);
 }
 
+std::expected<void, Error> WinMouseBackend::moveRelative(
+    const double deltaX, const double deltaY
+) {
+  INPUT input{};
+  input.type = INPUT_MOUSE;
+  input.mi.dx = static_cast<LONG>(std::lround(deltaX));
+  input.mi.dy = static_cast<LONG>(std::lround(deltaY));
+  input.mi.dwFlags = MOUSEEVENTF_MOVE;
+  return send(input);
+}
+
 std::expected<LogicalPoint, Error> WinMouseBackend::cursorPosition() {
   POINT p{};
   if (GetCursorPos(&p) == 0) {

@@ -21,6 +21,9 @@ class MacMouseBackend final : public backend::IMouseBackend {
   MacMouseBackend& operator=(const MacMouseBackend&) = delete;
 
   std::expected<void, Error> warpCursor(LogicalPoint point) override;
+  std::expected<void, Error> moveRelative(
+      double deltaX, double deltaY
+  ) override;
   std::expected<LogicalPoint, Error> cursorPosition() override;
   std::expected<void, Error> button(
       MouseButton button, ButtonAction action, int clickCount

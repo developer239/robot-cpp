@@ -28,6 +28,12 @@ std::expected<void, Error> Mouse::move(const LogicalPoint point) {
   return backend_->warpCursor(point);
 }
 
+std::expected<void, Error> Mouse::moveBy(
+    const double deltaX, const double deltaY
+) {
+  return backend_->moveRelative(deltaX, deltaY);
+}
+
 std::expected<void, Error> Mouse::moveSmooth(
     const LogicalPoint point, const MouseMoveOptions& options
 ) {
