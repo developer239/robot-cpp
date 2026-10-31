@@ -94,6 +94,7 @@ elseif(WIN32)
         src/platform/windows/WinMouseBackend.cpp
         src/platform/windows/WinScreenBackend.cpp
         src/platform/windows/WinEventTapBackend.cpp
+        src/platform/windows/WinWindowBackend.cpp
     )
 elseif(UNIX AND NOT APPLE)
     set(ROBOT_PLATFORM_SOURCES
@@ -166,7 +167,8 @@ elseif(WIN32)
     # user32/gdi32 for SendInput, hooks, GDI capture. Shcore and the DPI context
     # API are resolved at runtime (see WinDpi.cpp / WinScreenBackend.cpp), so they
     # are not linked here.
-    target_link_libraries(robot PRIVATE user32 gdi32)
+    # d3d11, dxgi, dwmapi and windowsapp for Windows Graphics Capture.
+    target_link_libraries(robot PRIVATE user32 gdi32 d3d11 dxgi dwmapi shcore windowsapp)
     target_compile_definitions(robot PRIVATE
         WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
 elseif(UNIX AND NOT APPLE)
