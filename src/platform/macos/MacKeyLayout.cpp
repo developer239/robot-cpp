@@ -29,8 +29,11 @@ constexpr std::array<Layer, 4> kLayers{{
 // block's, so a digit or a period maps to its main key.
 constexpr UInt16 kKeycodeCount = 128;
 
+// A layout's keys produce different characters on ANSI, ISO and JIS keyboards,
+// so the map belongs to the pair.
 struct LayoutMap {
   std::string sourceId;
+  UInt32 keyboardType = 0;
   std::unordered_map<char32_t, KeyStroke> strokes;
 };
 
@@ -69,16 +72,16 @@ std::optional<char32_t> singleScalar(
 
 // A key that starts a dead-key sequence leaves a dead state and types nothing
 // yet, so it is not mapped: its character takes the text-only key instead.
-LayoutMap buildMap(TISInputSourceRef source, std::string sourceId) {
-  LayoutMap map{std::move(sourceId), {}};
+LayoutMap buildMap(
+    TISInputSourceRef source, std::string sourceId, const UInt32 keyboardType
+) {
+  LayoutMap map{std::move(sourceId), keyboardType, {}};
   const auto data = static_cast<CFDataRef>(
       TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)
   );
   if (data == nullptr) return map;
   const auto* layout =
       reinterpret_cast<const UCKeyboardLayout*>(CFDataGetBytePtr(data));
-  const UInt32 keyboardType = LMGetKbdType();
-
   for (const Layer& layer : kLayers) {
     for (UInt16 keycode = 0; keycode < kKeycodeCount; ++keycode) {
       UInt32 deadState = 0;
@@ -106,12 +109,14 @@ std::optional<KeyStroke> keyStrokeForCharacter(const char32_t codepoint) {
   TISInputSourceRef source = TISCopyCurrentKeyboardLayoutInputSource();
   if (source == nullptr) return std::nullopt;
   std::string sourceId = inputSourceId(source);
+  const UInt32 keyboardType = LMGetKbdType();
 
   const std::scoped_lock lock(mutex);
   // The user can switch layouts between two calls, so the map follows the
   // current one.
-  if (cached.sourceId != sourceId || sourceId.empty()) {
-    cached = buildMap(source, std::move(sourceId));
+  if (cached.sourceId != sourceId || cached.keyboardType != keyboardType ||
+      sourceId.empty()) {
+    cached = buildMap(source, std::move(sourceId), keyboardType);
   }
   CFRelease(source);
 
