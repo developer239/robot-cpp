@@ -27,9 +27,12 @@ class MacKeyboardBackend final : public backend::IKeyboardBackend {
   std::expected<void, Error> keyUp(Key key) override;
   std::expected<void, Error> typeUnicode(char32_t codepoint) override;
 
+  // The flags of the modifier keys pressed and not yet released, which the
+  // mouse backend sets on its events too.
+  [[nodiscard]] CGEventFlags heldModifierFlags() const;
+
  private:
   std::expected<void, Error> postKey(Key key, bool down);
-  [[nodiscard]] CGEventFlags currentFlags() const;
 
   CGEventSourceRef source_ = nullptr;
   std::set<Key> heldModifiers_;

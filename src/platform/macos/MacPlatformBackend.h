@@ -18,7 +18,7 @@ class MacPlatformBackend final : public backend::IPlatformBackend {
   explicit MacPlatformBackend(Capabilities capabilities)
       : capabilities_(std::move(capabilities)),
         keyboard_(std::make_unique<MacKeyboardBackend>()),
-        mouse_(std::make_unique<MacMouseBackend>()),
+        mouse_(std::make_unique<MacMouseBackend>(*keyboard_)),
         screen_(std::make_unique<MacScreenBackend>()),
         eventTap_(std::make_unique<MacEventTapBackend>()),
         windows_(std::make_unique<MacWindowBackend>()) {}
@@ -32,6 +32,7 @@ class MacPlatformBackend final : public backend::IPlatformBackend {
 
  private:
   Capabilities capabilities_;
+  // Declared before mouse_, which holds a reference to it.
   std::unique_ptr<MacKeyboardBackend> keyboard_;
   std::unique_ptr<MacMouseBackend> mouse_;
   std::unique_ptr<MacScreenBackend> screen_;

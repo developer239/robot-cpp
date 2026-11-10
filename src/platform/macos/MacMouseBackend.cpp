@@ -44,7 +44,8 @@ CGEventType dragType(const MouseButton b) {
 
 }  // namespace
 
-MacMouseBackend::MacMouseBackend() {
+MacMouseBackend::MacMouseBackend(const MacKeyboardBackend& keyboard)
+    : keyboard_(keyboard) {
   source_ = CGEventSourceCreate(kCGEventSourceStatePrivate);
   if (source_ != nullptr) {
     CGEventSourceSetLocalEventsSuppressionInterval(source_, 0.0);
@@ -53,6 +54,15 @@ MacMouseBackend::MacMouseBackend() {
 
 MacMouseBackend::~MacMouseBackend() {
   if (source_ != nullptr) CFRelease(source_);
+}
+
+// A mouse event carries its modifiers as flags, like a key event, and its
+// source's private state knows nothing of the keyboard's, so the modifiers the
+// keyboard holds are set on it here: Shift-drag, Option-drag and Command-click
+// reach the application only this way.
+void MacMouseBackend::post(CGEventRef event) const {
+  CGEventSetFlags(event, keyboard_.heldModifierFlags());
+  CGEventPost(kCGHIDEventTap, event);
 }
 
 std::expected<void, Error> MacMouseBackend::warpCursor(const LogicalPoint point) {
@@ -69,7 +79,7 @@ std::expected<void, Error> MacMouseBackend::warpCursor(const LogicalPoint point)
   if (event == nullptr) {
     return std::unexpected(Error::platformError("CGEventCreateMouseEvent"));
   }
-  CGEventPost(kCGHIDEventTap, event);
+  post(event);
   CFRelease(event);
   return {};
 }
@@ -98,7 +108,7 @@ std::expected<void, Error> MacMouseBackend::moveRelative(
   CGEventSetIntegerValueField(
       event, kCGMouseEventDeltaY, static_cast<int64_t>(std::lround(deltaY))
   );
-  CGEventPost(kCGHIDEventTap, event);
+  post(event);
   CFRelease(event);
   return {};
 }
@@ -130,7 +140,7 @@ std::expected<void, Error> MacMouseBackend::button(
   }
   // Report the multi-click count so native double-click detection fires.
   CGEventSetIntegerValueField(event, kCGMouseEventClickState, clickCount);
-  CGEventPost(kCGHIDEventTap, event);
+  post(event);
   CFRelease(event);
 
   if (down) {
@@ -159,7 +169,7 @@ std::expected<void, Error> MacMouseBackend::scroll(const ScrollDelta delta) {
         Error::platformError("CGEventCreateScrollWheelEvent")
     );
   }
-  CGEventPost(kCGHIDEventTap, event);
+  post(event);
   CFRelease(event);
   return {};
 }

@@ -4,6 +4,7 @@
 
 #include <optional>
 
+#include "MacKeyboardBackend.h"
 #include "robot/backend/IMouseBackend.h"
 
 namespace robot::mac {
@@ -12,9 +13,10 @@ namespace robot::mac {
 // with a top-left origin, so LogicalPoint maps directly to CGPoint. Tracks the
 // currently-pressed button (per instance, not global) so warpCursor emits a drag
 // event while a button is held - the requirement that makes drags register.
+// Every event carries the modifiers the keyboard backend holds.
 class MacMouseBackend final : public backend::IMouseBackend {
  public:
-  MacMouseBackend();
+  explicit MacMouseBackend(const MacKeyboardBackend& keyboard);
   ~MacMouseBackend() override;
 
   MacMouseBackend(const MacMouseBackend&) = delete;
@@ -31,6 +33,9 @@ class MacMouseBackend final : public backend::IMouseBackend {
   std::expected<void, Error> scroll(ScrollDelta delta) override;
 
  private:
+  void post(CGEventRef event) const;
+
+  const MacKeyboardBackend& keyboard_;
   CGEventSourceRef source_ = nullptr;
   std::optional<MouseButton> pressedButton_;
 };

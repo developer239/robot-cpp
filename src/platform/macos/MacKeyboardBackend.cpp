@@ -37,7 +37,7 @@ MacKeyboardBackend::~MacKeyboardBackend() {
   if (source_ != nullptr) CFRelease(source_);
 }
 
-CGEventFlags MacKeyboardBackend::currentFlags() const {
+CGEventFlags MacKeyboardBackend::heldModifierFlags() const {
   CGEventFlags flags = 0;
   for (const Key k : heldModifiers_) flags |= macModifierFlag(k);
   return flags;
@@ -65,7 +65,7 @@ std::expected<void, Error> MacKeyboardBackend::postKey(
   if (event == nullptr) {
     return std::unexpected(Error::platformError("CGEventCreateKeyboardEvent"));
   }
-  CGEventSetFlags(event, currentFlags());
+  CGEventSetFlags(event, heldModifierFlags());
   CGEventPost(kCGHIDEventTap, event);
   CFRelease(event);
   return {};
