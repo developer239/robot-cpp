@@ -75,6 +75,7 @@ if(APPLE)
     set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
     set(ROBOT_PLATFORM_SOURCES
         src/platform/macos/MacBackendFactory.cpp
+        src/platform/macos/MacKeyLayout.cpp
         src/platform/macos/MacKeyMap.cpp
         src/platform/macos/MacKeyboardBackend.cpp
         src/platform/macos/MacMouseBackend.cpp
@@ -150,11 +151,14 @@ if(APPLE)
     find_library(CORE_MEDIA CoreMedia REQUIRED)
     find_library(CORE_VIDEO CoreVideo REQUIRED)
     find_library(APP_KIT AppKit REQUIRED)
+    find_library(CARBON Carbon REQUIRED)
     # Most platform framework types appear only in the platform .cpp/.mm files
     # (behind the backend interfaces), so those dependencies are PRIVATE.
     # CoreVideo is PUBLIC because the installed robot/mac/VideoFrame.h bridge
     # hands consumers a CVPixelBufferRef they lock through CoreVideo calls.
-    # Carbon is intentionally NOT used.
+    # Carbon is linked for Text Input Sources and UCKeyTranslate alone, the only
+    # API that reads the current keyboard layout (MacKeyLayout.cpp); key codes
+    # stay local constants rather than its deprecated parts.
     target_link_libraries(robot
         PUBLIC
             ${CORE_VIDEO}
@@ -162,7 +166,8 @@ if(APPLE)
             ${APPLICATION_SERVICES}
             ${SCREEN_CAPTURE_KIT}
             ${CORE_MEDIA}
-            ${APP_KIT})
+            ${APP_KIT}
+            ${CARBON})
 elseif(WIN32)
     # user32/gdi32 for SendInput, hooks, GDI capture. Shcore and the DPI context
     # API are resolved at runtime (see WinDpi.cpp / WinScreenBackend.cpp), so they
