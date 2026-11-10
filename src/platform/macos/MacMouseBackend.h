@@ -3,6 +3,7 @@
 #include <ApplicationServices/ApplicationServices.h>
 
 #include <optional>
+#include <set>
 
 #include "MacKeyboardBackend.h"
 #include "robot/backend/IMouseBackend.h"
@@ -11,7 +12,7 @@ namespace robot::mac {
 
 // Quartz mouse injection. macOS global event coordinates are in logical points
 // with a top-left origin, so LogicalPoint maps directly to CGPoint. Tracks the
-// currently-pressed button (per instance, not global) so warpCursor emits a drag
+// currently-pressed buttons (per instance, not global) so warpCursor emits a drag
 // event while a button is held - the requirement that makes drags register.
 // Every event carries the modifiers the keyboard backend holds.
 class MacMouseBackend final : public backend::IMouseBackend {
@@ -33,11 +34,12 @@ class MacMouseBackend final : public backend::IMouseBackend {
   std::expected<void, Error> scroll(ScrollDelta delta) override;
 
  private:
+  [[nodiscard]] std::optional<MouseButton> dragButton() const;
   void post(CGEventRef event) const;
 
   const MacKeyboardBackend& keyboard_;
   CGEventSourceRef source_ = nullptr;
-  std::optional<MouseButton> pressedButton_;
+  std::set<MouseButton> pressedButtons_;
 };
 
 }  // namespace robot::mac

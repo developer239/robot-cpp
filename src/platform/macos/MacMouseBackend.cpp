@@ -60,6 +60,13 @@ MacMouseBackend::~MacMouseBackend() {
 // source's private state knows nothing of the keyboard's, so the modifiers the
 // keyboard holds are set on it here: Shift-drag, Option-drag and Command-click
 // reach the application only this way.
+// With several buttons held, a move is the drag of the lowest one: left before
+// right before the others.
+std::optional<MouseButton> MacMouseBackend::dragButton() const {
+  if (pressedButtons_.empty()) return std::nullopt;
+  return *pressedButtons_.begin();
+}
+
 void MacMouseBackend::post(CGEventRef event) const {
   CGEventSetFlags(event, keyboard_.heldModifierFlags());
   CGEventPost(kCGHIDEventTap, event);
@@ -71,9 +78,9 @@ std::expected<void, Error> MacMouseBackend::warpCursor(const LogicalPoint point)
   // While a button is held, a move must be posted as that button's drag event or
   // the target application will not treat the gesture as a drag.
   const CGEventType type =
-      pressedButton_ ? dragType(*pressedButton_) : kCGEventMouseMoved;
+      dragButton() ? dragType(*dragButton()) : kCGEventMouseMoved;
   const CGMouseButton btn =
-      pressedButton_ ? cgButton(*pressedButton_) : kCGMouseButtonLeft;
+      dragButton() ? cgButton(*dragButton()) : kCGMouseButtonLeft;
 
   CGEventRef event = CGEventCreateMouseEvent(source_, type, target, btn);
   if (event == nullptr) {
@@ -92,9 +99,9 @@ std::expected<void, Error> MacMouseBackend::moveRelative(
 
   const CGPoint target = CGPointMake(here->x + deltaX, here->y + deltaY);
   const CGEventType type =
-      pressedButton_ ? dragType(*pressedButton_) : kCGEventMouseMoved;
+      dragButton() ? dragType(*dragButton()) : kCGEventMouseMoved;
   const CGMouseButton btn =
-      pressedButton_ ? cgButton(*pressedButton_) : kCGMouseButtonLeft;
+      dragButton() ? cgButton(*dragButton()) : kCGMouseButtonLeft;
 
   CGEventRef event = CGEventCreateMouseEvent(source_, type, target, btn);
   if (event == nullptr) {
@@ -143,10 +150,12 @@ std::expected<void, Error> MacMouseBackend::button(
   post(event);
   CFRelease(event);
 
+  // Each button is tracked on its own: releasing one leaves the others held,
+  // so a move made after it is still the remaining button's drag.
   if (down) {
-    pressedButton_ = button;
+    pressedButtons_.insert(button);
   } else {
-    pressedButton_.reset();
+    pressedButtons_.erase(button);
   }
   return {};
 }
