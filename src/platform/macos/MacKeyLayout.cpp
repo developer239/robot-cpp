@@ -25,8 +25,10 @@ constexpr std::array<Layer, 4> kLayers{{
      kCGEventFlagMaskShift | kCGEventFlagMaskAlternate},
 }};
 
-// Virtual key codes run below 128; the keypad's codes sit above the main
-// block's, so a digit or a period maps to its main key.
+// Virtual key codes run below 128. Within one modifier layer the keypad's codes
+// come after the main block's, so a digit or a period a plain key types maps to
+// its main key; a layer with fewer modifiers still wins over key position (a
+// layout whose number row needs Shift gets the keypad digit).
 constexpr UInt16 kKeycodeCount = 128;
 
 // A layout's keys produce different characters on ANSI, ISO and JIS keyboards,
