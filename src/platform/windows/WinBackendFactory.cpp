@@ -24,6 +24,8 @@ Capabilities buildCapabilities() {
   c.canCaptureScreen = true;
   c.canEnumerateMonitors = true;
   c.canRecordEvents = true;
+  c.canEnumerateWindows = true;
+  c.canStreamWindows = true;
 
   c.requiresAccessibilityPermission = false;
   c.requiresScreenRecordingPermission = false;

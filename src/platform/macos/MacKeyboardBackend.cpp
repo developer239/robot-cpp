@@ -2,6 +2,7 @@
 
 #include <array>
 
+#include "MacKeyLayout.h"
 #include "MacKeyMap.h"
 
 namespace robot::mac {
@@ -36,7 +37,7 @@ MacKeyboardBackend::~MacKeyboardBackend() {
   if (source_ != nullptr) CFRelease(source_);
 }
 
-CGEventFlags MacKeyboardBackend::currentFlags() const {
+CGEventFlags MacKeyboardBackend::heldModifierFlags() const {
   CGEventFlags flags = 0;
   for (const Key k : heldModifiers_) flags |= macModifierFlag(k);
   return flags;
@@ -64,7 +65,7 @@ std::expected<void, Error> MacKeyboardBackend::postKey(
   if (event == nullptr) {
     return std::unexpected(Error::platformError("CGEventCreateKeyboardEvent"));
   }
-  CGEventSetFlags(event, currentFlags());
+  CGEventSetFlags(event, heldModifierFlags());
   CGEventPost(kCGHIDEventTap, event);
   CFRelease(event);
   return {};
@@ -84,11 +85,17 @@ std::expected<void, Error> MacKeyboardBackend::typeUnicode(
   std::array<UniChar, 2> utf16{};
   const int len = toUtf16(codepoint, utf16);
 
-  // Keycode 0 with an attached Unicode string: the character is delivered by
-  // value, independent of the active layout. Held modifiers are intentionally
+  // The character is delivered by value through the attached Unicode string, on
+  // the key of the current layout that types it, with that key's Shift or
+  // Option: Chromium derives a keyup's key from its keycode, so a keyup on any
+  // other key would name a different key than the keydown did. A character no
+  // key types goes out on the text-only key. Held modifiers are intentionally
   // not applied to text (typing 'A' should not also send Command).
-  CGEventRef down = CGEventCreateKeyboardEvent(source_, 0, true);
-  CGEventRef up = CGEventCreateKeyboardEvent(source_, 0, false);
+  const auto stroke = keyStrokeForCharacter(codepoint);
+  const CGKeyCode keycode = stroke ? stroke->keycode : kTextOnlyKeycode;
+  const CGEventFlags flags = stroke ? stroke->flags : 0;
+  CGEventRef down = CGEventCreateKeyboardEvent(source_, keycode, true);
+  CGEventRef up = CGEventCreateKeyboardEvent(source_, keycode, false);
   if (down == nullptr || up == nullptr) {
     if (down != nullptr) CFRelease(down);
     if (up != nullptr) CFRelease(up);
@@ -102,9 +109,10 @@ std::expected<void, Error> MacKeyboardBackend::typeUnicode(
       up, static_cast<UniCharCount>(len), utf16.data()
   );
   // A new event's default flags come from the source's private state, which
-  // can still count a released modifier as held, so they are cleared here.
-  CGEventSetFlags(down, 0);
-  CGEventSetFlags(up, 0);
+  // can still count a released modifier as held, so they are set here to the
+  // stroke's own modifiers alone.
+  CGEventSetFlags(down, flags);
+  CGEventSetFlags(up, flags);
   CGEventPost(kCGHIDEventTap, down);
   CGEventPost(kCGHIDEventTap, up);
   CFRelease(down);

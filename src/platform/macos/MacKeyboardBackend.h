@@ -12,8 +12,9 @@ namespace robot::mac {
 // Quartz keyboard injection. Holds a private event source and the set of
 // currently-held modifier keys so that every synthesized event carries the
 // correct CGEvent modifier flags (the fix for the Command+C / capitals bug).
-// typeUnicode injects text directly via CGEventKeyboardSetUnicodeString, which is
-// layout-independent and unrelated to the keycode path.
+// typeUnicode injects text directly via CGEventKeyboardSetUnicodeString, on the
+// key the current layout types the character with (MacKeyLayout), so its keydown
+// and keyup name the same key.
 class MacKeyboardBackend final : public backend::IKeyboardBackend {
  public:
   MacKeyboardBackend();
@@ -26,9 +27,12 @@ class MacKeyboardBackend final : public backend::IKeyboardBackend {
   std::expected<void, Error> keyUp(Key key) override;
   std::expected<void, Error> typeUnicode(char32_t codepoint) override;
 
+  // The flags of the modifier keys pressed and not yet released, which the
+  // mouse backend sets on its events too.
+  [[nodiscard]] CGEventFlags heldModifierFlags() const;
+
  private:
   std::expected<void, Error> postKey(Key key, bool down);
-  [[nodiscard]] CGEventFlags currentFlags() const;
 
   CGEventSourceRef source_ = nullptr;
   std::set<Key> heldModifiers_;

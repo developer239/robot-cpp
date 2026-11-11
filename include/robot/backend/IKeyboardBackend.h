@@ -23,10 +23,12 @@ namespace robot::backend {
 // intended. On Windows and X11 the separately-injected modifier key-down is
 // usually sufficient, but tracking state keeps behaviour uniform.
 //
-// typeUnicode is a distinct path that injects a character directly, bypassing
-// keycodes and layout entirely (CGEventKeyboardSetUnicodeString, KEYEVENTF_
-// UNICODE, XTest with a temporarily remapped keysym). It is the only correct way
-// to emit arbitrary characters and must not be emulated with keyDown/keyUp.
+// typeUnicode is a distinct path that delivers a character by value
+// (CGEventKeyboardSetUnicodeString, KEYEVENTF_UNICODE, XTest with a temporarily
+// remapped keysym), whatever the layout. It is the only correct way to emit
+// arbitrary characters and must not be emulated with keyDown/keyUp. Where the
+// event also names a key (macOS), it names the key of the current layout that
+// types the character, so a keyup names the same key as its keydown.
 class IKeyboardBackend {
  public:
   virtual ~IKeyboardBackend() = default;

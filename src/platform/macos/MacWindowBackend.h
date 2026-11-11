@@ -32,6 +32,12 @@ class MacWindowBackend final : public backend::IWindowBackend {
       std::uint32_t windowId, const WindowStreamOptions& options,
       VideoFrameCallback onFrame, StreamErrorCallback onError
   ) override;
+
+  [[nodiscard]] std::expected<std::unique_ptr<backend::IWindowStreamBackend>, Error>
+  startMonitorStream(
+      std::uint32_t monitorId, const WindowStreamOptions& options,
+      VideoFrameCallback onFrame, StreamErrorCallback onError
+  ) override;
 };
 
 }  // namespace robot::mac

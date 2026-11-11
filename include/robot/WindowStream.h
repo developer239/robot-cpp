@@ -14,6 +14,9 @@ class IWindowStreamBackend;
 struct WindowStreamOptions {
   double maxFps = 60.0;  // must be finite and in [1, 1000]
   bool showsCursor = true;
+  // Monitor streams only: leave this process's own windows out of the frames,
+  // so an overlay never sees itself. A window stream only ever shows its window.
+  bool excludesOwnWindows = true;
 };
 
 // Invoked on the stream's internal capture thread for every delivered frame,

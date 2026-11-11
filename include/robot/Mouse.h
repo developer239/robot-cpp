@@ -46,6 +46,11 @@ class Mouse {
       LogicalPoint point, const MouseMoveOptions& options = {}
   );
 
+  // Relative motion for software that captures the cursor, such as game cameras
+  // and mouse steering. Units are logical on macOS and raw device counts
+  // elsewhere, where the OS pointer speed may also apply.
+  [[nodiscard]] std::expected<void, Error> moveBy(double deltaX, double deltaY);
+
   [[nodiscard]] std::expected<LogicalPoint, Error> position();
 
   [[nodiscard]] std::expected<void, Error> press(MouseButton button);

@@ -33,6 +33,17 @@ std::expected<void, Error> X11MouseBackend::warpCursor(const LogicalPoint point)
   return {};
 }
 
+std::expected<void, Error> X11MouseBackend::moveRelative(
+    const double deltaX, const double deltaY
+) {
+  XTestFakeRelativeMotionEvent(
+      connection_->display(), static_cast<int>(std::lround(deltaX)),
+      static_cast<int>(std::lround(deltaY)), CurrentTime
+  );
+  XFlush(connection_->display());
+  return {};
+}
+
 std::expected<LogicalPoint, Error> X11MouseBackend::cursorPosition() {
   Window rootReturn = 0;
   Window childReturn = 0;

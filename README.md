@@ -17,7 +17,7 @@ robot-cpp is built around the distinctions those libraries collapse:
 
 ## What it does
 
-- Move the cursor (absolute or smoothly interpolated), click, double-click, drag, and scroll, with buttons through X1/X2 and line- or pixel-unit scrolling.
+- Move the cursor (absolute, smoothly interpolated, or by a raw relative delta for software that captures it), click, double-click, drag, and scroll, with buttons through X1/X2 and line- or pixel-unit scrolling.
 - Press and release physical keys by position, build modifier chords, and type arbitrary Unicode text independent of the active keyboard layout.
 - Enumerate every display with its own scale factor and both logical and physical bounds, capture any region or a whole monitor at native pixel resolution, sample individual pixels, and encode captures as PNG.
 - Enumerate on-screen application windows, query their current bounds and z-order, activate their owning application, and stream a single window as zero-copy video frames carrying the density and content-rect metadata needed to map frame pixels back to desktop coordinates (macOS ScreenCaptureKit; reported as Unsupported elsewhere until those backends exist).
@@ -159,6 +159,7 @@ Mouse control operates in global logical coordinates (the virtual desktop shared
 ```cpp
 mouse.move({800.0, 450.0});          // absolute warp in logical coordinates
 mouse.moveSmooth({100.0, 100.0});    // interpolated over a duration
+mouse.moveBy(12.0, -7.0);            // raw delta, for game cameras and mouse steering
 
 mouse.click();                       // left click at the current position
 mouse.click(robot::MouseButton::Right);
@@ -237,6 +238,8 @@ if (auto point = robot::toWindowPoint(frame.info(), pixelX, pixelY)) {
                              bounds->origin.y + point->y};
 }
 ```
+
+`windows.streamMonitor(monitor.id, options, onFrame, onError)` streams a whole monitor under the same rules (macOS ScreenCaptureKit; Unsupported elsewhere until those backends exist). By default it leaves the calling process's own windows out of the frames, so an overlay never captures itself; set `excludesOwnWindows` to false to include them.
 
 `topmostWindowId()` reports the topmost normal-layer window in z-order (an ordering query - the honest primitive for "is my target frontmost"), and `activateApplicationFor(windowId)` brings a window's owning application forward; which of its windows ends up on top is the OS's decision.
 

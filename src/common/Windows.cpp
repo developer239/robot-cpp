@@ -61,14 +61,13 @@ std::expected<void, Error> Windows::activateApplicationFor(
   return backend_->activateApplicationForWindow(windowId);
 }
 
-std::expected<WindowStream, Error> Windows::stream(
-    const std::uint32_t windowId, const WindowStreamOptions& options,
-    VideoFrameCallback onFrame, StreamErrorCallback onError
-) {
+std::expected<void, Error> Windows::validateStream(
+    const WindowStreamOptions& options, const VideoFrameCallback& onFrame
+) const {
   if (backend_ == nullptr) return std::unexpected(Error::unsupported(kNoBackend));
   if (onFrame == nullptr) {
     return std::unexpected(
-        Error::invalidArgument("stream() requires a frame callback")
+        Error::invalidArgument("streaming requires a frame callback")
     );
   }
   if (!std::isfinite(options.maxFps) || options.maxFps < 1.0 ||
@@ -78,8 +77,34 @@ std::expected<WindowStream, Error> Windows::stream(
     )));
   }
 
+  return {};
+}
+
+std::expected<WindowStream, Error> Windows::stream(
+    const std::uint32_t windowId, const WindowStreamOptions& options,
+    VideoFrameCallback onFrame, StreamErrorCallback onError
+) {
+  if (auto valid = validateStream(options, onFrame); !valid) {
+    return std::unexpected(valid.error());
+  }
+
   auto stream = backend_->startStream(
       windowId, options, std::move(onFrame), std::move(onError)
+  );
+  if (!stream) return std::unexpected(stream.error());
+  return WindowStream(std::move(*stream));
+}
+
+std::expected<WindowStream, Error> Windows::streamMonitor(
+    const std::uint32_t monitorId, const WindowStreamOptions& options,
+    VideoFrameCallback onFrame, StreamErrorCallback onError
+) {
+  if (auto valid = validateStream(options, onFrame); !valid) {
+    return std::unexpected(valid.error());
+  }
+
+  auto stream = backend_->startMonitorStream(
+      monitorId, options, std::move(onFrame), std::move(onError)
   );
   if (!stream) return std::unexpected(stream.error());
   return WindowStream(std::move(*stream));

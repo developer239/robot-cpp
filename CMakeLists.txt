@@ -75,6 +75,7 @@ if(APPLE)
     set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
     set(ROBOT_PLATFORM_SOURCES
         src/platform/macos/MacBackendFactory.cpp
+        src/platform/macos/MacKeyLayout.cpp
         src/platform/macos/MacKeyMap.cpp
         src/platform/macos/MacKeyboardBackend.cpp
         src/platform/macos/MacMouseBackend.cpp
@@ -94,6 +95,7 @@ elseif(WIN32)
         src/platform/windows/WinMouseBackend.cpp
         src/platform/windows/WinScreenBackend.cpp
         src/platform/windows/WinEventTapBackend.cpp
+        src/platform/windows/WinWindowBackend.cpp
     )
 elseif(UNIX AND NOT APPLE)
     set(ROBOT_PLATFORM_SOURCES
@@ -149,11 +151,14 @@ if(APPLE)
     find_library(CORE_MEDIA CoreMedia REQUIRED)
     find_library(CORE_VIDEO CoreVideo REQUIRED)
     find_library(APP_KIT AppKit REQUIRED)
+    find_library(CARBON Carbon REQUIRED)
     # Most platform framework types appear only in the platform .cpp/.mm files
     # (behind the backend interfaces), so those dependencies are PRIVATE.
     # CoreVideo is PUBLIC because the installed robot/mac/VideoFrame.h bridge
     # hands consumers a CVPixelBufferRef they lock through CoreVideo calls.
-    # Carbon is intentionally NOT used.
+    # Carbon is linked for Text Input Sources and UCKeyTranslate alone, the only
+    # API that reads the current keyboard layout (MacKeyLayout.cpp); key codes
+    # stay local constants rather than its deprecated parts.
     target_link_libraries(robot
         PUBLIC
             ${CORE_VIDEO}
@@ -161,12 +166,14 @@ if(APPLE)
             ${APPLICATION_SERVICES}
             ${SCREEN_CAPTURE_KIT}
             ${CORE_MEDIA}
-            ${APP_KIT})
+            ${APP_KIT}
+            ${CARBON})
 elseif(WIN32)
     # user32/gdi32 for SendInput, hooks, GDI capture. Shcore and the DPI context
     # API are resolved at runtime (see WinDpi.cpp / WinScreenBackend.cpp), so they
     # are not linked here.
-    target_link_libraries(robot PRIVATE user32 gdi32)
+    # d3d11, dxgi, dwmapi and windowsapp for Windows Graphics Capture.
+    target_link_libraries(robot PRIVATE user32 gdi32 d3d11 dxgi dwmapi shcore windowsapp)
     target_compile_definitions(robot PRIVATE
         WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
 elseif(UNIX AND NOT APPLE)

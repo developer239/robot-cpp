@@ -6,9 +6,11 @@
 #import <ScreenCaptureKit/ScreenCaptureKit.h>
 
 #include <mach/mach_time.h>
+#include <unistd.h>
 
 #include <atomic>
 #include <chrono>
+#include <format>
 #include <memory>
 #include <optional>
 
@@ -207,13 +209,15 @@ std::int32_t intValue(CFDictionaryRef dict, CFStringRef key) {
   return value;
 }
 
-std::expected<SCShareableContent*, Error> fetchShareableContent() {
+std::expected<SCShareableContent*, Error> fetchShareableContent(
+    const BOOL isOnScreenOnly = YES
+) {
   dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
   __block SCShareableContent* content = nil;
   __block NSError* error = nil;
   [SCShareableContent
       getShareableContentExcludingDesktopWindows:YES
-                             onScreenWindowsOnly:YES
+                             onScreenWindowsOnly:isOnScreenOnly
                                completionHandler:^(
                                    SCShareableContent* result, NSError* err
                                ) {
@@ -294,6 +298,79 @@ class MacWindowStream final : public backend::IWindowStreamBackend {
   dispatch_queue_t queue_ = nil;
   std::shared_ptr<StreamChannel> channel_;
 };
+
+// Starts capture of whatever the filter selects, at its native pixel size.
+std::expected<std::unique_ptr<backend::IWindowStreamBackend>, Error>
+startFilteredStream(
+    SCContentFilter* filter, const std::uint32_t windowId,
+    const WindowStreamOptions& options, VideoFrameCallback onFrame,
+    StreamErrorCallback onError
+) {
+  SCStreamConfiguration* config = [[SCStreamConfiguration alloc] init];
+  const double scale = static_cast<double>(filter.pointPixelScale);
+  config.width = static_cast<size_t>(filter.contentRect.size.width * scale);
+  config.height = static_cast<size_t>(filter.contentRect.size.height * scale);
+  config.pixelFormat = kCVPixelFormatType_32BGRA;
+  config.minimumFrameInterval =
+      CMTimeMake(1, static_cast<std::int32_t>(options.maxFps));
+  config.queueDepth = 3;
+  config.showsCursor = options.showsCursor ? YES : NO;
+
+  dispatch_queue_t queue =
+      dispatch_queue_create("robot.window-stream", DISPATCH_QUEUE_SERIAL);
+  auto channel = std::make_shared<StreamChannel>();
+  channel->onFrame = std::move(onFrame);
+  channel->onError = std::move(onError);
+  channel->queue = queue;
+  channel->windowId = windowId;
+  channel->active.store(true);
+
+  RobotWindowStreamOutput* output = [[RobotWindowStreamOutput alloc] init];
+  output->channel = channel;
+  SCStream* stream = [[SCStream alloc] initWithFilter:filter
+                                        configuration:config
+                                             delegate:output];
+
+  NSError* addError = nil;
+  [stream addStreamOutput:output
+                     type:SCStreamOutputTypeScreen
+       sampleHandlerQueue:queue
+                    error:&addError];
+  if (addError != nil) {
+    return std::unexpected(
+        Error::captureFailed(addError.localizedDescription.UTF8String)
+    );
+  }
+
+  dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+  __block NSError* startError = nil;
+  [stream startCaptureWithCompletionHandler:^(NSError* err) {
+    startError = err;
+    dispatch_semaphore_signal(semaphore);
+  }];
+  const auto deadline =
+      dispatch_time(DISPATCH_TIME_NOW, 5 * static_cast<int64_t>(NSEC_PER_SEC));
+  if (dispatch_semaphore_wait(semaphore, deadline) != 0) {
+    // Startup may still complete later; deactivate the channel and issue a
+    // fire-and-forget stop so a late success never delivers frames.
+    // startError is deliberately not read here - the completion handler may
+    // still be about to write it.
+    channel->active.store(false);
+    [stream stopCaptureWithCompletionHandler:^(NSError*) {
+    }];
+    return std::unexpected(Error::captureFailed("timed out starting capture"));
+  }
+  if (startError != nil) {
+    channel->active.store(false);
+    return std::unexpected(
+        Error::captureFailed(startError.localizedDescription.UTF8String)
+    );
+  }
+
+  return std::make_unique<MacWindowStream>(
+      stream, output, queue, std::move(channel)
+  );
+}
 
 }  // namespace
 
@@ -444,69 +521,57 @@ MacWindowBackend::startStream(
 
   SCContentFilter* filter =
       [[SCContentFilter alloc] initWithDesktopIndependentWindow:scWindow];
-  SCStreamConfiguration* config = [[SCStreamConfiguration alloc] init];
-  const double scale = static_cast<double>(filter.pointPixelScale);
-  config.width = static_cast<size_t>(filter.contentRect.size.width * scale);
-  config.height = static_cast<size_t>(filter.contentRect.size.height * scale);
-  config.pixelFormat = kCVPixelFormatType_32BGRA;
-  config.minimumFrameInterval =
-      CMTimeMake(1, static_cast<std::int32_t>(options.maxFps));
-  config.queueDepth = 3;
-  config.showsCursor = options.showsCursor ? YES : NO;
 
-  dispatch_queue_t queue =
-      dispatch_queue_create("robot.window-stream", DISPATCH_QUEUE_SERIAL);
-  auto channel = std::make_shared<StreamChannel>();
-  channel->onFrame = std::move(onFrame);
-  channel->onError = std::move(onError);
-  channel->queue = queue;
-  channel->windowId = windowId;
-  channel->active.store(true);
+  return startFilteredStream(
+      filter, windowId, options, std::move(onFrame), std::move(onError)
+  );
+}
 
-  RobotWindowStreamOutput* output = [[RobotWindowStreamOutput alloc] init];
-  output->channel = channel;
-  SCStream* stream = [[SCStream alloc] initWithFilter:filter
-                                        configuration:config
-                                             delegate:output];
-
-  NSError* addError = nil;
-  [stream addStreamOutput:output
-                     type:SCStreamOutputTypeScreen
-       sampleHandlerQueue:queue
-                    error:&addError];
-  if (addError != nil) {
+std::expected<std::unique_ptr<backend::IWindowStreamBackend>, Error>
+MacWindowBackend::startMonitorStream(
+    const std::uint32_t monitorId, const WindowStreamOptions& options,
+    VideoFrameCallback onFrame, StreamErrorCallback onError
+) {
+  if (@available(macOS 14.0, *)) {
+    // Streaming is available; continue below.
+  } else {
     return std::unexpected(
-        Error::captureFailed(addError.localizedDescription.UTF8String)
+        Error::unsupported("monitor streaming requires macOS 14 or newer")
     );
   }
 
-  dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
-  __block NSError* startError = nil;
-  [stream startCaptureWithCompletionHandler:^(NSError* err) {
-    startError = err;
-    dispatch_semaphore_signal(semaphore);
-  }];
-  const auto deadline =
-      dispatch_time(DISPATCH_TIME_NOW, 5 * static_cast<int64_t>(NSEC_PER_SEC));
-  if (dispatch_semaphore_wait(semaphore, deadline) != 0) {
-    // Startup may still complete later; deactivate the channel and issue a
-    // fire-and-forget stop so a late success never delivers frames.
-    // startError is deliberately not read here - the completion handler may
-    // still be about to write it.
-    channel->active.store(false);
-    [stream stopCaptureWithCompletionHandler:^(NSError*) {
-    }];
-    return std::unexpected(Error::captureFailed("timed out starting capture"));
+  // Includes windows not on screen yet: a caller that creates its overlay just
+  // before streaming would otherwise not be listed, and so not be excluded.
+  auto contentResult = fetchShareableContent(NO);
+  if (!contentResult) return std::unexpected(contentResult.error());
+
+  SCDisplay* scDisplay = nil;
+  for (SCDisplay* display in (*contentResult).displays) {
+    if (display.displayID == monitorId) {
+      scDisplay = display;
+      break;
+    }
   }
-  if (startError != nil) {
-    channel->active.store(false);
-    return std::unexpected(
-        Error::captureFailed(startError.localizedDescription.UTF8String)
-    );
+  if (scDisplay == nil) {
+    return std::unexpected(Error::invalidArgument(
+        std::format("no monitor with id {}", monitorId)
+    ));
   }
 
-  return std::make_unique<MacWindowStream>(
-      stream, output, queue, std::move(channel)
+  NSMutableArray<SCRunningApplication*>* excluded = [NSMutableArray array];
+  if (options.excludesOwnWindows) {
+    for (SCRunningApplication* app in (*contentResult).applications) {
+      if (app.processID == getpid()) [excluded addObject:app];
+    }
+  }
+
+  SCContentFilter* filter =
+      [[SCContentFilter alloc] initWithDisplay:scDisplay
+                         excludingApplications:excluded
+                              exceptingWindows:@[]];
+
+  return startFilteredStream(
+      filter, 0, options, std::move(onFrame), std::move(onError)
   );
 }
 
